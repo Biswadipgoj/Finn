@@ -1322,7 +1322,6 @@ export default function AdminDashboard() {
           </div>
         </div>
       )}
-    </div>
       <BottomNav role="admin" pendingCount={pendingCount} />
       <div className="h-16 sm:hidden" />
     </div>
