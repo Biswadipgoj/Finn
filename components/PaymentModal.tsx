@@ -434,8 +434,17 @@ export default function PaymentModal({ customer, emis, breakdown, onClose, onSub
 
           {/* ── ACTIONS ── */}
           <div className="flex gap-3 pb-1">
-            <button onClick={onClose} className="btn-secondary flex-1 py-3">Cancel</button>
-            <button onClick={handleSubmit} disabled={loading} className="btn-primary flex-1 py-3">
+            <button type="button" onClick={onClose} className="btn-secondary flex-1 py-3">Cancel</button>
+            <button
+              type="button"
+              onClick={(event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                void handleSubmit();
+              }}
+              disabled={loading}
+              className="btn-primary flex-1 py-3"
+            >
               {loading ? 'Processing…' : isAdmin ? '✓ Record Payment' : '→ Submit Request'}
             </button>
           </div>
