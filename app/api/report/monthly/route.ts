@@ -1,5 +1,49 @@
 import { NextRequest, NextResponse } from 'next/server';
+import * as XLSX from 'xlsx';
 import { createClient, createServiceClient } from '@/lib/supabase/server';
+
+type CustomerRow = {
+  customer_name: string;
+  mobile: string;
+  alternate_number_1?: string | null;
+  imei?: string | null;
+  emi_due_day?: number | null;
+  emi_amount?: number | null;
+  first_emi_charge_amount?: number | null;
+  first_emi_charge_paid_at?: string | null;
+};
+
+type EmiRow = {
+  customer_id: string;
+  emi_no: number;
+  due_date: string;
+  amount: number;
+  status: 'UNPAID' | 'PENDING_APPROVAL' | 'APPROVED';
+};
+
+type CollectionExportRow = {
+  imei: string;
+  srNo: number;
+  customerName: string;
+  customerNumber: string;
+  alternateNumber: string;
+  firstEmiDate: string;
+  dueDay: string | number;
+  emiAmount: string | number;
+  firstEmiCharge: string | number;
+};
+
+const COLUMNS = [
+  'IMEI NO',
+  'SR NO.',
+  'CUST NAME',
+  'CUSTOMER NUMBER',
+  'ALTARNET NUMBER',
+  '1st EMI',
+  'Date',
+  'EMI Amount',
+  '1st emi charge',
+] as const;
 
 export async function GET(req: NextRequest) {
   const supabase = createClient();
@@ -13,19 +57,18 @@ export async function GET(req: NextRequest) {
   const month = parseInt(searchParams.get('month') || String(new Date().getMonth() + 1));
   const year = parseInt(searchParams.get('year') || String(new Date().getFullYear()));
 
-  // Get month name abbreviation
   const monthNames = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
   const monthLabel = monthNames[month - 1] + "'" + String(year).slice(-2);
 
-  // Fetch all retailers
   const { data: retailers } = await svc.from('retailers').select('id, name').eq('is_active', true).order('name');
   if (!retailers?.length) return NextResponse.json({ error: 'No retailers found' }, { status: 404 });
 
-  // For each retailer, fetch their customers with EMIs due this month
-  const csvRows: string[] = [];
+  const wb = XLSX.utils.book_new();
+  const sheetRows: (string | number)[][] = [];
+  const merges: XLSX.Range[] = [];
+  const titleRowIndexes: number[] = [];
 
   for (const retailer of retailers) {
-    // Get customers for this retailer
     const { data: customers } = await svc.from('customers')
       .select(`
         id, customer_name, mobile, alternate_number_1, imei, emi_due_day,
@@ -33,91 +76,131 @@ export async function GET(req: NextRequest) {
       `)
       .eq('retailer_id', retailer.id)
       .neq('status', 'COMPLETE')
-      .order('emi_due_day')
       .order('customer_name');
 
     if (!customers?.length) continue;
 
-    // Get EMI schedules for all these customers
-    const customerIds = customers.map(c => c.id);
+    const customerIds = customers.map((customer) => customer.id);
     const { data: allEmis } = await svc.from('emi_schedule')
-      .select('id, customer_id, emi_no, due_date, amount, status, paid_at, mode, utr, fine_amount, fine_paid_amount, fine_paid_at')
+      .select('customer_id, emi_no, due_date, amount, status')
       .in('customer_id', customerIds)
       .order('emi_no');
 
+    if (sheetRows.length > 0) sheetRows.push(Array(COLUMNS.length).fill(''));
 
-
-    // Build retailer section header
-    csvRows.push(',,,,,,,,,,,,,,,');
-    csvRows.push(`${retailer.name.toUpperCase()} - EMI COLLECTION SHEET FOR THE MONTH OF ${monthLabel},,,,,,,,,,,,,,,`);
-    csvRows.push('IMEI NO,SR NO.,CUST NAME,CUSTOMER NUMBER,ALTARNET NUMBER,1st EMI,Date,EMI Amount,1st emi charge,,,,,,,');
+    const titleRowIndex = sheetRows.length;
+    titleRowIndexes.push(titleRowIndex);
+    sheetRows.push([`${retailer.name.toUpperCase()} - EMI COLLECTION SHEET FOR THE MONTH OF ${monthLabel}`, ...Array(COLUMNS.length - 1).fill('')]);
+    merges.push({ s: { r: titleRowIndex, c: 0 }, e: { r: titleRowIndex, c: COLUMNS.length - 1 } });
+    sheetRows.push([...COLUMNS]);
 
     let srNo = 0;
     for (const cust of customers) {
-      srNo++;
-      const custEmis = (allEmis || []).filter(e => e.customer_id === cust.id);
-      const firstEmi = custEmis[0];
-      // Find first EMI date
-      const firstEmiDate = firstEmi ? formatDateShort(firstEmi.due_date) : '';
-      const dueDay = cust.emi_due_day || '';
-
-      // EMI amount — check for FINE DUE status
-      const allPaid = custEmis.every(e => e.status === 'APPROVED');
-      const hasUnpaidFine = custEmis.some(e => (e.fine_amount || 0) > 0 && (e.fine_paid_amount || 0) < (e.fine_amount || 0));
-      let emiAmountStr = String(cust.emi_amount || '');
-      if (allPaid && hasUnpaidFine) emiAmountStr = 'FINE DUE';
-
-      // 1st EMI charge
-      const firstChargeStr = (cust.first_emi_charge_amount > 0 && !cust.first_emi_charge_paid_at)
-        ? String(cust.first_emi_charge_amount) : '';
-
-
-
-      // Build CSV row matching exact format
-      const row = [
-        cust.imei || '',
-        srNo,
-        cust.customer_name || '',
-        cust.mobile || '',
-        cust.alternate_number_1 || '0',
-        firstEmiDate,
-        dueDay,
-        emiAmountStr,
-        firstChargeStr,
-        '', '', '', '', '', '', ''
-      ].map(v => escapeCsv(String(v))).join(',');
-
-      csvRows.push(row);
+      srNo += 1;
+      const custEmis = (allEmis || []).filter((emi) => emi.customer_id === cust.id);
+      const row = buildCollectionRow(cust, custEmis, srNo);
+      sheetRows.push([
+        row.imei,
+        row.srNo,
+        row.customerName,
+        row.customerNumber,
+        row.alternateNumber,
+        row.firstEmiDate,
+        row.dueDay,
+        row.emiAmount,
+        row.firstEmiCharge,
+      ]);
     }
   }
 
-  // Add trailing empty row
-  csvRows.push(',,,,,,,,,,,,,,,');
+  if (sheetRows.length === 0) {
+    return NextResponse.json({ error: 'No running customers found for active retailers' }, { status: 404 });
+  }
 
-  const csvContent = csvRows.join('\r\n');
-  const filename = `TelePoint_Collection_${monthNames[month-1]}_${year}.csv`;
+  const ws = XLSX.utils.aoa_to_sheet(sheetRows);
+  ws['!merges'] = merges;
+  ws['!cols'] = buildColumnWidths(sheetRows);
 
-  return new NextResponse(csvContent, {
+  forceImeiColumnToText(ws, sheetRows);
+  styleRetailerHeaders(ws, titleRowIndexes);
+
+  XLSX.utils.book_append_sheet(wb, ws, 'Monthly Collection');
+  const buf = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
+  const filename = `TelePoint_Collection_${monthNames[month - 1]}_${year}.xlsx`;
+
+  return new NextResponse(buf, {
     headers: {
-      'Content-Type': 'text/csv; charset=utf-8',
+      'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
       'Content-Disposition': `attachment; filename="${filename}"`,
     },
   });
 }
 
-function escapeCsv(val: string): string {
-  if (val.includes(',') || val.includes('"') || val.includes('\n')) {
-    return '"' + val.replace(/"/g, '""') + '"';
+function buildCollectionRow(cust: CustomerRow & { id: string }, custEmis: EmiRow[], srNo: number): CollectionExportRow {
+  const sortedEmis = [...custEmis].sort((a, b) => a.emi_no - b.emi_no);
+  const firstEmi = sortedEmis[0];
+  const nextDueEmi = sortedEmis.find((emi) => emi.status !== 'APPROVED');
+
+  return {
+    imei: normalizeImei(cust.imei),
+    srNo,
+    customerName: cust.customer_name || '',
+    customerNumber: cust.mobile || '',
+    alternateNumber: cust.alternate_number_1 || '0',
+    firstEmiDate: firstEmi ? formatDateShort(firstEmi.due_date) : '',
+    dueDay: cust.emi_due_day || '',
+    emiAmount: nextDueEmi?.amount ?? cust.emi_amount ?? '',
+    firstEmiCharge: (cust.first_emi_charge_amount && cust.first_emi_charge_amount > 0 && !cust.first_emi_charge_paid_at)
+      ? cust.first_emi_charge_amount
+      : '',
+  };
+}
+
+function buildColumnWidths(rows: (string | number)[][]): XLSX.ColInfo[] {
+  return COLUMNS.map((_, columnIndex) => {
+    const maxLength = rows.reduce((max, row) => {
+      const value = row[columnIndex] ?? '';
+      return Math.max(max, String(value).length);
+    }, String(COLUMNS[columnIndex]).length);
+
+    if (columnIndex === 0) return { wch: Math.max(18, maxLength + 2) };
+    return { wch: Math.min(Math.max(maxLength + 2, 12), 40) };
+  });
+}
+
+function forceImeiColumnToText(ws: XLSX.WorkSheet, rows: (string | number)[][]) {
+  for (let rowIndex = 0; rowIndex < rows.length; rowIndex += 1) {
+    const cellAddress = XLSX.utils.encode_cell({ r: rowIndex, c: 0 });
+    const cell = ws[cellAddress];
+    if (!cell || rows[rowIndex][0] === COLUMNS[0] || rows[rowIndex].every((value) => value === '')) continue;
+    cell.t = 's';
+    cell.z = '@';
   }
-  return val;
+}
+
+function styleRetailerHeaders(ws: XLSX.WorkSheet, titleRowIndexes: number[]) {
+  titleRowIndexes.forEach((rowIndex) => {
+    const cellAddress = XLSX.utils.encode_cell({ r: rowIndex, c: 0 });
+    if (!ws[cellAddress]) return;
+
+    ws[cellAddress].s = {
+      font: { bold: true, color: { rgb: 'FFFFFF' }, sz: 14 },
+      alignment: { horizontal: 'center', vertical: 'center' },
+      fill: { fgColor: { rgb: '1F4E78' } },
+    };
+  });
+}
+
+function normalizeImei(imei?: string | null): string {
+  return imei ? String(imei).trim() : '';
 }
 
 function formatDateShort(dateStr: string): string {
-  try {
-    const d = new Date(dateStr);
-    const day = d.getDate();
-    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-    const yr = String(d.getFullYear()).slice(-2);
-    return `${day}-${months[d.getMonth()]}-${yr}`;
-  } catch { return dateStr; }
+  const d = new Date(dateStr);
+  if (Number.isNaN(d.getTime())) return dateStr;
+
+  const day = d.getDate();
+  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  const yr = String(d.getFullYear()).slice(-2);
+  return `${day}-${months[d.getMonth()]}-${yr}`;
 }

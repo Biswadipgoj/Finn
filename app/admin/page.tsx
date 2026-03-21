@@ -803,7 +803,7 @@ export default function AdminDashboard() {
               {/* Monthly Collection Sheet — retailer-wise CSV */}
               <div className="card p-5 mb-6">
                 <p className="section-header">📋 Monthly Collection Sheet</p>
-                <p className="text-xs text-ink-muted mb-4">Download retailer-wise EMI collection sheet (same format as your existing CSV)</p>
+                <p className="text-xs text-ink-muted mb-4">Download retailer-wise EMI collection sheet as Excel with merged retailer headers, centered title styling, and one next-EMI row per customer</p>
                 <div className="flex flex-wrap items-end gap-3">
                   <div>
                     <label className="label">Month</label>
@@ -824,7 +824,7 @@ export default function AdminDashboard() {
                     download
                     className="btn-primary"
                   >
-                    📥 Download CSV
+                    📥 Download Excel
                   </a>
                 </div>
               </div>
