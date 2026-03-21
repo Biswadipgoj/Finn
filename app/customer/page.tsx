@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import Link from 'next/link';
 import { Customer, EMISchedule, DueBreakdown } from '@/lib/types';
 import { format, differenceInDays } from 'date-fns';
 import toast from 'react-hot-toast';
@@ -37,13 +38,11 @@ export default function CustomerPortal() {
   const [mobile, setMobile] = useState('');
   const [loading, setLoading] = useState(false);
   const [session, setSession] = useState<CustomerSession | null>(null);
-  const [showUpcomingAlert, setShowUpcomingAlert] = useState(false);
   // Multi-loan selection
   const [multiLoans, setMultiLoans] = useState<MultiLoanEntry[] | null>(null);
   const [loadingLoan, setLoadingLoan] = useState(false);
   // Broadcast messages
   const [broadcastMessages, setBroadcastMessages] = useState<{ id: string; message: string; image_url?: string | null; expires_at: string; sender_name?: string; sender_role?: string }[]>([]);
-  const [dismissedBroadcasts, setDismissedBroadcasts] = useState<Set<string>>(new Set());
 
   // Restore session from localStorage OR auto-login via token
   useEffect(() => {
@@ -104,7 +103,6 @@ export default function CustomerPortal() {
     if (!breakdown?.next_emi_due_date) return;
     const daysUntilDue = differenceInDays(new Date(breakdown.next_emi_due_date), new Date());
     if (daysUntilDue >= 0 && daysUntilDue <= 5) {
-      setShowUpcomingAlert(true);
     }
   }, [session]);
 
@@ -174,7 +172,6 @@ export default function CustomerPortal() {
 
   function handleLogout() {
     setSession(null);
-    setShowUpcomingAlert(false);
     setMultiLoans(null);
     localStorage.removeItem(SESSION_KEY);
     setAadhaar('');
@@ -244,6 +241,14 @@ export default function CustomerPortal() {
         </div>
 
         <div className="relative w-full max-w-md animate-slide-up">
+          <div className="mb-6 flex justify-center">
+            <Link
+              href="/"
+              className="inline-flex items-center gap-2 rounded-xl border border-sapphire-500/20 bg-white/80 px-4 py-2 text-sm font-semibold text-sapphire-700 shadow-sm backdrop-blur transition hover:bg-white"
+            >
+              ← Home
+            </Link>
+          </div>
           <div className="text-center mb-10">
             <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-sapphire-500/10 border border-sapphire-500/20 mb-5">
               <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#60a5fa" strokeWidth="1.5">
@@ -314,16 +319,30 @@ export default function CustomerPortal() {
     <div className="min-h-screen page-bg">
       {/* Navbar */}
       <nav className="sticky top-0 z-40 border-b border-surface-4 bg-white/90 backdrop-blur-md">
-        <div className="max-w-md mx-auto px-4 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-2.5">
-            <div className="w-7 h-7 rounded-lg bg-sapphire-500/15 border border-sapphire-500/20 flex items-center justify-center">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#60a5fa" strokeWidth="2">
-                <path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2M12 11a4 4 0 100-8 4 4 0 000 8z" />
-              </svg>
+        <div className="max-w-md mx-auto px-4 py-3 flex flex-col gap-3 sm:h-16 sm:flex-row sm:items-center sm:justify-between sm:py-0">
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2.5">
+              <div className="w-7 h-7 rounded-lg bg-sapphire-500/15 border border-sapphire-500/20 flex items-center justify-center">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#60a5fa" strokeWidth="2">
+                  <path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2M12 11a4 4 0 100-8 4 4 0 000 8z" />
+                </svg>
+              </div>
+              <span className="font-display text-base font-semibold text-ink">My Account</span>
             </div>
-            <span className="font-display text-base font-semibold text-ink">My Account</span>
+            <Link
+              href="/"
+              className="inline-flex items-center gap-2 rounded-xl border border-sapphire-500/20 bg-sapphire-50 px-4 py-2 text-sm font-semibold text-sapphire-700 shadow-sm transition hover:bg-sapphire-100 sm:hidden"
+            >
+              ← Home
+            </Link>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+            <Link
+              href="/"
+              className="hidden items-center gap-2 rounded-xl border border-sapphire-500/20 bg-sapphire-50 px-4 py-2 text-sm font-semibold text-sapphire-700 shadow-sm transition hover:bg-sapphire-100 sm:inline-flex"
+            >
+              ← Home
+            </Link>
             <span className="text-sm text-slate-400 hidden sm:block">{customer?.customer_name}</span>
             <button onClick={async () => {
               const t = localStorage.getItem(TOKEN_KEY);
