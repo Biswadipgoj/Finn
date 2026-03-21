@@ -23,14 +23,16 @@ type EmiRow = {
 
 type CollectionExportRow = {
   imei: string;
-  srNo: number;
+  srNo: number | string;
   customerName: string;
   customerNumber: string;
   alternateNumber: string;
   firstEmiDate: string;
   dueDay: string | number;
   emiAmount: string | number;
+  collectionType: string;
   firstEmiCharge: string | number;
+  remarks: string;
 };
 
 const COLUMNS = [
@@ -43,6 +45,9 @@ const COLUMNS = [
   'Date',
   'EMI Amount',
   '1st emi charge',
+  'Collection Type',
+  '1st emi charge',
+  'Remarks',
 ] as const;
 
 export async function GET(req: NextRequest) {
@@ -83,6 +88,9 @@ export async function GET(req: NextRequest) {
     const customerIds = customers.map((customer) => customer.id);
     const { data: allEmis } = await svc.from('emi_schedule')
       .select('customer_id, emi_no, due_date, amount, status')
+    const customerIds = customers.map(c => c.id);
+    const { data: allEmis } = await svc.from('emi_schedule')
+      .select('customer_id, emi_no, due_date, amount, status, fine_amount, fine_paid_amount')
       .in('customer_id', customerIds)
       .order('emi_no');
 
@@ -92,6 +100,9 @@ export async function GET(req: NextRequest) {
     titleRowIndexes.push(titleRowIndex);
     sheetRows.push([`${retailer.name.toUpperCase()} - EMI COLLECTION SHEET FOR THE MONTH OF ${monthLabel}`, ...Array(COLUMNS.length - 1).fill('')]);
     merges.push({ s: { r: titleRowIndex, c: 0 }, e: { r: titleRowIndex, c: COLUMNS.length - 1 } });
+    sheetRows.push([`${retailer.name.toUpperCase()} - EMI COLLECTION SHEET FOR THE MONTH OF ${monthLabel}`, ...Array(COLUMNS.length - 1).fill('')]);
+    merges.push({ s: { r: titleRowIndex, c: 0 }, e: { r: titleRowIndex, c: COLUMNS.length - 1 } });
+
     sheetRows.push([...COLUMNS]);
 
     let srNo = 0;
@@ -110,6 +121,22 @@ export async function GET(req: NextRequest) {
         row.emiAmount,
         row.firstEmiCharge,
       ]);
+      const exportRows = buildCollectionRows(cust, custEmis, srNo);
+      exportRows.forEach((row) => {
+        sheetRows.push([
+          row.imei,
+          row.srNo,
+          row.customerName,
+          row.customerNumber,
+          row.alternateNumber,
+          row.firstEmiDate,
+          row.dueDay,
+          row.emiAmount,
+          row.collectionType,
+          row.firstEmiCharge,
+          row.remarks,
+        ]);
+      });
     }
   }
 
@@ -123,6 +150,13 @@ export async function GET(req: NextRequest) {
 
   forceImeiColumnToText(ws, sheetRows);
   styleRetailerHeaders(ws, titleRowIndexes);
+
+  XLSX.utils.book_append_sheet(wb, ws, 'Monthly Collection');
+  const buf = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
+  const filename = `TelePoint_Collection_${monthNames[month - 1]}_${year}.xlsx`;
+
+
+  forceImeiColumnToText(ws, sheetRows);
 
   XLSX.utils.book_append_sheet(wb, ws, 'Monthly Collection');
   const buf = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
@@ -142,6 +176,26 @@ function buildCollectionRow(cust: CustomerRow & { id: string }, custEmis: EmiRow
   const nextDueEmi = sortedEmis.find((emi) => emi.status !== 'APPROVED');
 
   return {
+function buildCollectionRows(cust: CustomerRow & { id: string }, custEmis: EmiRow[], srNo: number): CollectionExportRow[] {
+  const sortedEmis = [...custEmis].sort((a, b) => a.emi_no - b.emi_no);
+  const firstEmi = sortedEmis[0];
+  const firstEmiDate = firstEmi ? formatDateShort(firstEmi.due_date) : '';
+  const dueDay = cust.emi_due_day || '';
+  const nextDueEmi = sortedEmis.find((emi) => emi.status !== 'APPROVED');
+  const emiDueAmount = nextDueEmi?.amount ?? cust.emi_amount ?? '';
+
+  const fineDue = sortedEmis.reduce((sum, emi) => {
+    const fineAmount = emi.fine_amount || 0;
+    const finePaid = emi.fine_paid_amount || 0;
+    return sum + Math.max(fineAmount - finePaid, 0);
+  }, 0);
+  const hasFine = fineDue > 0;
+
+  const firstChargeStr = (cust.first_emi_charge_amount && cust.first_emi_charge_amount > 0 && !cust.first_emi_charge_paid_at)
+    ? cust.first_emi_charge_amount
+    : '';
+
+  const baseRow: Omit<CollectionExportRow, 'emiAmount' | 'collectionType' | 'remarks'> = {
     imei: normalizeImei(cust.imei),
     srNo,
     customerName: cust.customer_name || '',
@@ -189,6 +243,66 @@ function styleRetailerHeaders(ws: XLSX.WorkSheet, titleRowIndexes: number[]) {
       fill: { fgColor: { rgb: '1F4E78' } },
     };
   });
+}
+
+    firstEmiDate,
+    dueDay,
+    firstEmiCharge: firstChargeStr,
+  };
+
+  const rows: CollectionExportRow[] = [];
+
+  if (emiDueAmount !== '') {
+    rows.push({
+      ...baseRow,
+      emiAmount: emiDueAmount,
+      collectionType: 'EMI',
+      remarks: nextDueEmi ? `EMI #${nextDueEmi.emi_no}` : '',
+    });
+  }
+
+  if (hasFine) {
+    rows.push({
+      ...baseRow,
+      srNo: '',
+      emiAmount: fineDue,
+      collectionType: 'Fine/Penalty',
+      remarks: 'Additional fine due',
+    });
+  }
+
+  if (!rows.length) {
+    rows.push({
+      ...baseRow,
+      emiAmount: '',
+      collectionType: 'EMI',
+      remarks: '',
+    });
+  }
+
+  return rows;
+}
+
+function buildColumnWidths(rows: (string | number)[][]): XLSX.ColInfo[] {
+  return COLUMNS.map((_, columnIndex) => {
+    const maxLength = rows.reduce((max, row) => {
+      const value = row[columnIndex] ?? '';
+      return Math.max(max, String(value).length);
+    }, String(COLUMNS[columnIndex]).length);
+
+    if (columnIndex === 0) return { wch: Math.max(18, maxLength + 2) };
+    return { wch: Math.min(Math.max(maxLength + 2, 12), 40) };
+  });
+}
+
+function forceImeiColumnToText(ws: XLSX.WorkSheet, rows: (string | number)[][]) {
+  for (let rowIndex = 0; rowIndex < rows.length; rowIndex += 1) {
+    const cellAddress = XLSX.utils.encode_cell({ r: rowIndex, c: 0 });
+    const cell = ws[cellAddress];
+    if (!cell || rowIndex === 0 || rows[rowIndex][0] === COLUMNS[0] || rows[rowIndex].every((value) => value === '')) continue;
+    cell.t = 's';
+    cell.z = '@';
+  }
 }
 
 function normalizeImei(imei?: string | null): string {
