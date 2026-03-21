@@ -17,10 +17,6 @@ export async function GET(req: NextRequest) {
   const monthNames = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
   const monthLabel = monthNames[month - 1] + "'" + String(year).slice(-2);
 
-  // Calculate month range for filtering EMI payments
-  const monthStart = new Date(year, month - 1, 1);
-  const monthEnd = new Date(year, month, 0); // last day of month
-
   // Fetch all retailers
   const { data: retailers } = await svc.from('retailers').select('id, name').eq('is_active', true).order('name');
   if (!retailers?.length) return NextResponse.json({ error: 'No retailers found' }, { status: 404 });
@@ -36,7 +32,7 @@ export async function GET(req: NextRequest) {
         emi_amount, first_emi_charge_amount, first_emi_charge_paid_at, status
       `)
       .eq('retailer_id', retailer.id)
-      .in('status', ['RUNNING', 'COMPLETE', 'NPA'])
+      .neq('status', 'COMPLETE')
       .order('emi_due_day')
       .order('customer_name');
 
@@ -49,26 +45,18 @@ export async function GET(req: NextRequest) {
       .in('customer_id', customerIds)
       .order('emi_no');
 
-    // Get payment requests for this month for remarks
-    const { data: paymentReqs } = await svc.from('payment_requests')
-      .select('customer_id, total_emi_amount, fine_amount, first_emi_charge_amount, mode, utr, approved_at, notes')
-      .in('customer_id', customerIds)
-      .eq('status', 'APPROVED')
-      .gte('approved_at', monthStart.toISOString())
-      .lte('approved_at', monthEnd.toISOString() + 'T23:59:59Z');
+
 
     // Build retailer section header
     csvRows.push(',,,,,,,,,,,,,,,');
     csvRows.push(`${retailer.name.toUpperCase()} - EMI COLLECTION SHEET FOR THE MONTH OF ${monthLabel},,,,,,,,,,,,,,,`);
-    csvRows.push('IMEI NO,SR NO.,CUST NAME,CUSTOMER NUMBER,ALTARNET NUMBER,1st EMI,Date,EMI Amount,1st emi charge,remarks,,,,,,');
+    csvRows.push('IMEI NO,SR NO.,CUST NAME,CUSTOMER NUMBER,ALTARNET NUMBER,1st EMI,Date,EMI Amount,1st emi charge,,,,,,,');
 
     let srNo = 0;
     for (const cust of customers) {
       srNo++;
       const custEmis = (allEmis || []).filter(e => e.customer_id === cust.id);
       const firstEmi = custEmis[0];
-      const custPayments = (paymentReqs || []).filter(p => p.customer_id === cust.id);
-
       // Find first EMI date
       const firstEmiDate = firstEmi ? formatDateShort(firstEmi.due_date) : '';
       const dueDay = cust.emi_due_day || '';
@@ -78,25 +66,12 @@ export async function GET(req: NextRequest) {
       const hasUnpaidFine = custEmis.some(e => (e.fine_amount || 0) > 0 && (e.fine_paid_amount || 0) < (e.fine_amount || 0));
       let emiAmountStr = String(cust.emi_amount || '');
       if (allPaid && hasUnpaidFine) emiAmountStr = 'FINE DUE';
-      if (cust.status === 'COMPLETE') emiAmountStr = 'CLOSE';
 
       // 1st EMI charge
       const firstChargeStr = (cust.first_emi_charge_amount > 0 && !cust.first_emi_charge_paid_at)
         ? String(cust.first_emi_charge_amount) : '';
 
-      // Remarks: payment date + mode/utr for this month
-      const remarks: string[] = [];
-      for (const pmt of custPayments) {
-        const payDate = pmt.approved_at ? formatDateShort2(pmt.approved_at) : '';
-        if (payDate) remarks.push(payDate);
-        if (pmt.utr) remarks.push(pmt.utr);
-        if (pmt.fine_amount > 0) remarks.push(`${pmt.total_emi_amount}+${pmt.fine_amount}`);
-        if (pmt.first_emi_charge_amount > 0) remarks.push(`${pmt.first_emi_charge_amount}/-`);
-      }
 
-      // Check lock status for remarks
-      // (we'd need is_locked field but keeping it simple)
-      const remarkStr = remarks.join(',');
 
       // Build CSV row matching exact format
       const row = [
@@ -109,8 +84,7 @@ export async function GET(req: NextRequest) {
         dueDay,
         emiAmountStr,
         firstChargeStr,
-        remarkStr,
-        '', '', '', '', '', ''
+        '', '', '', '', '', '', ''
       ].map(v => escapeCsv(String(v))).join(',');
 
       csvRows.push(row);
@@ -146,14 +120,4 @@ function formatDateShort(dateStr: string): string {
     const yr = String(d.getFullYear()).slice(-2);
     return `${day}-${months[d.getMonth()]}-${yr}`;
   } catch { return dateStr; }
-}
-
-function formatDateShort2(dateStr: string): string {
-  try {
-    const d = new Date(dateStr);
-    const dd = String(d.getDate()).padStart(2, '0');
-    const mm = String(d.getMonth() + 1).padStart(2, '0');
-    const yr = String(d.getFullYear()).slice(-2);
-    return `${dd}.${mm}.${yr}`;
-  } catch { return ''; }
 }

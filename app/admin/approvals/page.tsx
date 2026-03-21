@@ -224,14 +224,23 @@ export default function ApprovalsPage() {
     <div className="min-h-screen page-bg">
       <NavBar role="admin" userName="TELEPOINT" />
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-8">
         {/* Header */}
-        <div className="flex items-center justify-between mb-8">
-          <div>
-            <h1 className="font-display text-3xl font-bold text-ink">Payment Approvals</h1>
-            <p className="text-ink-muted text-sm mt-1">Review and approve retailer payment requests</p>
-          </div>
-          <div className="flex items-center gap-3">
+        <div className="sticky top-14 z-30 -mx-4 mb-6 border-b border-surface-4 bg-white/95 px-4 py-4 backdrop-blur sm:static sm:mx-0 sm:mb-8 sm:border-0 sm:bg-transparent sm:px-0 sm:py-0">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-start justify-between gap-3 sm:block">
+              <div>
+                <Link
+                  href="/admin"
+                  className="mb-3 inline-flex items-center gap-2 rounded-xl border border-brand-300 bg-brand-50 px-4 py-2 text-sm font-semibold text-brand-700 shadow-sm transition hover:bg-brand-100"
+                >
+                  ← Home
+                </Link>
+                <h1 className="font-display text-3xl font-bold text-ink">Payment Approvals</h1>
+                <p className="text-ink-muted text-sm mt-1">Review and approve retailer payment requests</p>
+              </div>
+            </div>
+            <div className="flex flex-wrap items-center gap-3">
             <div className="flex bg-surface-2 rounded-xl p-1 border border-surface-4">
               <button
                 onClick={() => { setStatusFilter('PENDING'); fetchPending(searchQuery || undefined, 'PENDING'); }}
@@ -257,6 +266,7 @@ export default function ApprovalsPage() {
             </svg>
             {loading ? 'Loading…' : 'Load'}
           </button>
+          </div>
           </div>
         </div>
 
