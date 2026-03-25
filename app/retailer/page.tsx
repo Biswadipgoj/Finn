@@ -427,7 +427,6 @@ export default function RetailerDashboard() {
           isAdmin={false}
         />
       )}
-    </div>
       <BottomNav role="retailer" />
     </div>
   );
