@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Customer, EMISchedule, DueBreakdown } from '@/lib/types';
 import { format, differenceInDays } from 'date-fns';
 import toast from 'react-hot-toast';
@@ -44,6 +44,8 @@ export default function CustomerPortal() {
   // Broadcast messages
   const [broadcastMessages, setBroadcastMessages] = useState<{ id: string; message: string; image_url?: string | null; expires_at: string; sender_name?: string; sender_role?: string }[]>([]);
   const [dismissedBroadcasts, setDismissedBroadcasts] = useState<Set<string>>(new Set());
+  const [isLaunchingUpi, setIsLaunchingUpi] = useState(false);
+  const [pendingWhatsappShare, setPendingWhatsappShare] = useState(false);
 
   // Restore session from localStorage OR auto-login via token
   useEffect(() => {
@@ -182,12 +184,112 @@ export default function CustomerPortal() {
   }
 
   const { customer, emis, breakdown } = session ?? { customer: null, emis: [], breakdown: null };
-  const paidEmis = emis.filter(e => e.status === 'APPROVED');
-  const unpaidEmis = emis.filter(e => e.status === 'UNPAID');
+  const sortedEmis = useMemo(
+    () => [...emis].sort((a, b) => new Date(a.due_date).getTime() - new Date(b.due_date).getTime()),
+    [emis],
+  );
+  const paidEmis = sortedEmis.filter(e => e.status === 'APPROVED');
+  const unpaidEmis = sortedEmis.filter(e => e.status === 'UNPAID');
   const nextUnpaidEmi = unpaidEmis[0];
   const daysUntilDue = nextUnpaidEmi
     ? differenceInDays(new Date(nextUnpaidEmi.due_date), new Date())
     : null;
+
+  const dueSummary = useMemo(() => {
+    const af = calculateTotalFineFromEmis(sortedEmis);
+    const baseFine = Math.max(450, breakdown?.fine_due ?? 0, af > 0 ? 450 : 0);
+    const weeklyFine = Math.max(0, af - 450);
+    const emiDue = breakdown?.selected_emi_amount || breakdown?.next_emi_amount || 0;
+    const totalDue = emiDue + baseFine + weeklyFine;
+    return { emiDue, baseFine, weeklyFine, totalDue, nextDueDate: breakdown?.next_emi_due_date };
+  }, [sortedEmis, breakdown]);
+
+  async function buildReceiptFile(totalAmount: number) {
+    const canvas = document.createElement('canvas');
+    canvas.width = 1080;
+    canvas.height = 1480;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return null;
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = '#0f172a';
+    ctx.font = 'bold 56px sans-serif';
+    ctx.fillText('TelePoint Payment Receipt', 80, 120);
+    ctx.font = '36px sans-serif';
+    const rows = [
+      `Name: ${customer?.customer_name || '-'}`,
+      `Mobile: ${customer?.mobile || '-'}`,
+      `IMEI: ${customer?.imei || '-'}`,
+      `EMI Due: ${fmt(dueSummary.emiDue)}`,
+      `Base Fine: ${fmt(dueSummary.baseFine)}`,
+      `Weekly Fine: ${fmt(dueSummary.weeklyFine)}`,
+      `Total Amount: ${fmt(totalAmount)}`,
+      `Date: ${format(new Date(), 'd MMM yyyy, h:mm a')}`,
+      'Payment Mode: UPI',
+      'UPI Receiver: biswajit.khanra82@axl',
+    ];
+    rows.forEach((row, i) => ctx.fillText(row, 80, 230 + i * 90));
+    return await new Promise<File | null>((resolve) => {
+      canvas.toBlob((blob) => {
+        if (!blob) { resolve(null); return; }
+        resolve(new File([blob], `receipt-${customer?.imei || 'emi'}.png`, { type: 'image/png' }));
+      }, 'image/png');
+    });
+  }
+
+  async function shareOnWhatsapp(totalAmount: number) {
+    const text = [
+      'TelePoint EMI Payment Update',
+      `Customer: ${customer?.customer_name || '-'}`,
+      `Mobile: ${customer?.mobile || '-'}`,
+      `IMEI: ${customer?.imei || '-'}`,
+      `EMI Due: ${fmt(dueSummary.emiDue)}`,
+      `Base Fine: ${fmt(dueSummary.baseFine)}`,
+      `Weekly Fine: ${fmt(dueSummary.weeklyFine)}`,
+      `Total Paid: ${fmt(totalAmount)}`,
+      `Paid On: ${format(new Date(), 'd MMM yyyy, h:mm a')}`,
+    ].join('\n');
+    const file = await buildReceiptFile(totalAmount);
+    try {
+      if (file && navigator.canShare?.({ files: [file] })) {
+        await navigator.share({ files: [file], text, title: 'TelePoint Receipt' });
+        return;
+      }
+    } catch {
+      // fall back to whatsapp deep link
+    }
+    window.open(`https://wa.me/917003617029?text=${encodeURIComponent(text)}`, '_blank');
+    if (file) {
+      const url = URL.createObjectURL(file);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = file.name;
+      a.click();
+      URL.revokeObjectURL(url);
+      toast('Receipt image downloaded. Attach it in WhatsApp if needed.');
+    }
+  }
+
+  async function handleOnlinePay() {
+    if (!customer || dueSummary.totalDue <= 0) return;
+    const amount = Number(dueSummary.totalDue.toFixed(2));
+    const upiUrl = `upi://pay?pa=biswajit.khanra82@axl&pn=TelePoint&am=${amount}&cu=INR&tn=${encodeURIComponent(`${customer.imei}-${customer.customer_name}`)}`;
+    setPendingWhatsappShare(true);
+    setIsLaunchingUpi(true);
+    window.location.href = upiUrl;
+  }
+
+  useEffect(() => {
+    function onVisible() {
+      if (document.visibilityState === 'visible' && pendingWhatsappShare && isLaunchingUpi) {
+        setIsLaunchingUpi(false);
+        setPendingWhatsappShare(false);
+        shareOnWhatsapp(dueSummary.totalDue);
+      }
+    }
+    document.addEventListener('visibilitychange', onVisible);
+    return () => document.removeEventListener('visibilitychange', onVisible);
+  }, [pendingWhatsappShare, isLaunchingUpi, dueSummary.totalDue]);
 
   if (!session) {
     // Multi-loan selection screen
@@ -371,7 +473,7 @@ export default function CustomerPortal() {
 
         {/* Phase 6: Smart Alert Popup */}
         <SmartAlertPopup
-          fineDue={calculateTotalFineFromEmis(emis)}
+          fineDue={calculateTotalFineFromEmis(sortedEmis)}
           daysUntilDue={daysUntilDue}
           nextEmiNo={nextUnpaidEmi?.emi_no}
           nextEmiAmount={nextUnpaidEmi?.amount}
@@ -453,7 +555,7 @@ export default function CustomerPortal() {
             <div className="flex items-center gap-2 text-xs">
               <span className="text-jade-400 font-semibold">{paidEmis.length} paid</span>
               <span className="text-slate-600">/</span>
-              <span className="text-slate-400">{emis.length} total</span>
+              <span className="text-slate-400">{sortedEmis.length} total</span>
             </div>
           </div>
 
@@ -465,13 +567,13 @@ export default function CustomerPortal() {
             <div className="h-2 bg-surface-3 rounded-full overflow-hidden">
               <div
                 className="h-full bg-gradient-to-r from-jade-500 to-jade-400 rounded-full transition-all duration-700"
-                style={{ width: `${emis.length > 0 ? (paidEmis.length / emis.length) * 100 : 0}%` }}
+                style={{ width: `${sortedEmis.length > 0 ? (paidEmis.length / sortedEmis.length) * 100 : 0}%` }}
               />
             </div>
           </div>
 
           <div className="divide-y divide-white/[0.03]">
-            {emis.map(emi => {
+            {sortedEmis.map(emi => {
               const isOverdue = emi.status === 'UNPAID' && new Date(emi.due_date) < new Date();
               const daysLeft = differenceInDays(new Date(emi.due_date), new Date());
               const isUpcoming = emi.status === 'UNPAID' && daysLeft >= 0 && daysLeft <= 5;
@@ -514,46 +616,85 @@ export default function CustomerPortal() {
         {/* Due summary */}
                 {/* Due summary with auto-calculated fine */}
         {(() => {
-          const af = calculateTotalFineFromEmis(emis);
-          const fineDue = Math.max(breakdown?.fine_due ?? 0, af);
-          const emiDue = breakdown?.selected_emi_amount || breakdown?.next_emi_amount || 0;
-          const fcDue = breakdown?.first_emi_charge_due ?? 0;
-          const totalDue = emiDue + fineDue + fcDue;
+          const totalDue = dueSummary.totalDue;
           return totalDue > 0 ? (
             <div className="card p-5">
               <p className="text-xs font-semibold text-slate-400 uppercase tracking-widest mb-4">Next Payment Due</p>
               <div className="space-y-2.5">
-                {emiDue > 0 && <div className="flex justify-between text-sm"><span className="text-slate-400">EMI #{breakdown?.next_emi_no}</span><span className="font-num text-ink">{fmt(emiDue)}</span></div>}
-                {fcDue > 0 && <div className="flex justify-between text-sm"><span className="text-gold-400">1st EMI Charge</span><span className="font-num text-gold-400">{fmt(fcDue)}</span></div>}
-                {fineDue > 0 && <div className="flex justify-between text-sm"><span className="text-crimson-400">Late Fine</span><span className="font-num text-crimson-400">{fmt(fineDue)}</span></div>}
+                {dueSummary.emiDue > 0 && <div className="flex justify-between text-sm"><span className="text-slate-400">EMI #{breakdown?.next_emi_no}</span><span className="font-num text-ink">{fmt(dueSummary.emiDue)}</span></div>}
+                {dueSummary.baseFine > 0 && <div className="flex justify-between text-sm"><span className="text-crimson-400">Base Fine</span><span className="font-num text-crimson-400">{fmt(dueSummary.baseFine)}</span></div>}
+                {dueSummary.weeklyFine > 0 && <div className="flex justify-between text-sm"><span className="text-crimson-400">Weekly Charge</span><span className="font-num text-crimson-400">{fmt(dueSummary.weeklyFine)}</span></div>}
                 <div className="h-px bg-white/[0.06]" />
                 <div className="flex justify-between"><span className="font-semibold text-ink">Total Payable</span><span className="font-num text-xl font-bold text-gold-400">{fmt(totalDue)}</span></div>
               </div>
-              {breakdown?.next_emi_due_date && <p className="text-xs text-slate-500 mt-3">Due: {format(new Date(breakdown.next_emi_due_date), 'd MMM yyyy')}</p>}
-              <p className="text-xs text-slate-600 mt-2">Contact your retailer to make a payment.</p>
+              {dueSummary.nextDueDate && <p className="text-xs text-slate-500 mt-3">Due: {format(new Date(dueSummary.nextDueDate), 'd MMM yyyy')}</p>}
+              <p className="text-xs text-slate-600 mt-2">Pay online via UPI and auto-share receipt on WhatsApp.</p>
             </div>
           ) : null;
         })()}
 
         {/* Fine Breakdown */}
         {(() => {
-          const fb = getPerEmiFineBreakdown(emis);
+          const fb = getPerEmiFineBreakdown(sortedEmis);
           if (!fb.length) return null;
           return (
             <div className="card overflow-hidden">
               <div className="px-5 py-3 border-b border-surface-4"><span className="text-xs font-semibold text-slate-400 uppercase tracking-widest">⚠️ Fine Details</span></div>
               <div className="divide-y divide-white/[0.03]">
-                {fb.map(r => (
+                {fb.sort((a, b) => a.emi_no - b.emi_no).map(r => (
                   <div key={r.emi_no} className="px-5 py-3 space-y-1">
                     <div className="flex justify-between"><span className="text-sm font-medium text-ink">EMI #{r.emi_no}</span><span className="text-xs text-crimson-400 font-semibold">{r.days}d overdue</span></div>
                     <div className="flex justify-between text-xs text-slate-500"><span>Base ₹450</span><span className="font-num">{fmt(r.baseFine)}</span></div>
                     {r.weeklyFine > 0 && <div className="flex justify-between text-xs text-slate-500"><span>+₹25/wk</span><span className="font-num">{fmt(r.weeklyFine)}</span></div>}
                     <div className="flex justify-between text-sm font-semibold"><span className="text-crimson-400">Total</span><span className="font-num text-crimson-400">{fmt(r.totalFine)}</span></div>
-                    {r.paid > 0 && <div className="flex justify-between text-xs"><span className="text-jade-400">Paid{(() => { const e = emis.find(x => x.emi_no === r.emi_no); return e?.fine_paid_at ? ` (${new Date(e.fine_paid_at).toLocaleDateString('en-IN', {day:'numeric',month:'short'})})` : ''; })()}</span><span className="font-num text-jade-400">-{fmt(r.paid)}</span></div>}
+                    {r.paid > 0 && <div className="flex justify-between text-xs"><span className="text-jade-400">Paid{(() => { const e = sortedEmis.find(x => x.emi_no === r.emi_no); return e?.fine_paid_at ? ` (${new Date(e.fine_paid_at).toLocaleDateString('en-IN', {day:'numeric',month:'short'})})` : ''; })()}</span><span className="font-num text-jade-400">-{fmt(r.paid)}</span></div>}
                   </div>
                 ))}
               </div>
               <div className="px-5 py-3 border-t border-surface-4"><p className="text-[11px] text-slate-600">₹450 base + ₹25/week until paid. Contact retailer.</p></div>
+            </div>
+          );
+        })()}
+
+        {/* Fine History */}
+        {(() => {
+          const fineRows = sortedEmis
+            .filter(e => (e.fine_amount || 0) > 0 || (e.fine_paid_amount || 0) > 0)
+            .map(e => {
+              const total = Number(e.fine_amount || 0);
+              const paid = Number(e.fine_paid_amount || 0);
+              return {
+                id: e.id,
+                emiNo: e.emi_no,
+                detectedAt: format(new Date(e.due_date), 'd MMM yyyy'),
+                total,
+                paid,
+                pending: Math.max(0, total - paid),
+                status: total > 0 && paid >= total ? 'PAID' : 'PENDING',
+              };
+            });
+          if (!fineRows.length) return null;
+          return (
+            <div className="card overflow-hidden">
+              <div className="px-5 py-3 border-b border-surface-4">
+                <span className="text-xs font-semibold text-slate-400 uppercase tracking-widest">🧾 Fine History</span>
+              </div>
+              <div className="divide-y divide-surface-3">
+                {fineRows.map(r => (
+                  <div key={r.id} className="px-5 py-3 text-xs">
+                    <div className="flex items-center justify-between">
+                      <p className="font-semibold text-ink">EMI #{r.emiNo}</p>
+                      <span className={r.status === 'PAID' ? 'badge-approved' : 'badge-pending'}>{r.status}</span>
+                    </div>
+                    <div className="mt-1.5 grid grid-cols-2 gap-1.5">
+                      <p className="text-slate-500">Detected Date</p><p className="text-right font-num">{r.detectedAt}</p>
+                      <p className="text-slate-500">Total Fine</p><p className="text-right font-num">{fmt(r.total)}</p>
+                      <p className="text-slate-500">Paid</p><p className="text-right font-num text-jade-400">{fmt(r.paid)}</p>
+                      <p className="text-slate-500">Pending</p><p className="text-right font-num text-crimson-400">{fmt(r.pending)}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
           );
         })()}
@@ -575,16 +716,16 @@ export default function CustomerPortal() {
 
         {/* Payment Summary — Full Transparency */}
         {session && (() => {
-          const paidEmis = emis.filter(e => e.status === 'APPROVED');
+          const paidEmis = sortedEmis.filter(e => e.status === 'APPROVED');
           const totalEmiPaid = paidEmis.reduce((s, e) => s + e.amount, 0);
-          const totalFineDue = emis.reduce((s, e) => s + Math.max(0, (e.fine_amount || 0) - (e.fine_paid_amount || 0)), 0);
-          const totalFinePaid = emis.reduce((s, e) => s + (e.fine_paid_amount || 0), 0);
-          const totalEmiDue = emis.filter(e => e.status === 'UNPAID').reduce((s, e) => s + e.amount, 0);
+          const totalFineDue = sortedEmis.reduce((s, e) => s + Math.max(0, (e.fine_amount || 0) - (e.fine_paid_amount || 0)), 0);
+          const totalFinePaid = sortedEmis.reduce((s, e) => s + (e.fine_paid_amount || 0), 0);
+          const totalEmiDue = sortedEmis.filter(e => e.status === 'UNPAID').reduce((s, e) => s + e.amount, 0);
           return (
             <div className="card overflow-hidden">
               <div className="px-5 py-3 border-b border-surface-4"><span className="text-xs font-semibold text-slate-400 uppercase tracking-widest">💳 Payment Summary</span></div>
               <div className="px-5 py-4 space-y-2.5">
-                <div className="flex justify-between text-sm"><span className="text-slate-400">EMIs Paid</span><span className="font-num text-jade-400">{paidEmis.length} / {emis.length}</span></div>
+                <div className="flex justify-between text-sm"><span className="text-slate-400">EMIs Paid</span><span className="font-num text-jade-400">{paidEmis.length} / {sortedEmis.length}</span></div>
                 <div className="flex justify-between text-sm"><span className="text-slate-400">Total EMI Paid</span><span className="font-num text-jade-400">{fmt(totalEmiPaid)}</span></div>
                 <div className="flex justify-between text-sm"><span className="text-slate-400">EMI Remaining</span><span className="font-num text-ink">{fmt(totalEmiDue)}</span></div>
                 <div className="h-px bg-white/[0.06]" />
@@ -597,8 +738,8 @@ export default function CustomerPortal() {
         })()}
 
         {/* Payment History — shows paid EMIs with dates */}
-        {session && emis.some(e => e.status === 'APPROVED' && e.paid_at) && (() => {
-          const paidEmis = emis.filter(e => e.status === 'APPROVED' && e.paid_at);
+        {session && sortedEmis.some(e => e.status === 'APPROVED' && e.paid_at) && (() => {
+          const paidEmis = sortedEmis.filter(e => e.status === 'APPROVED' && e.paid_at);
           if (!paidEmis.length) return null;
           return (
             <div className="card overflow-hidden">
@@ -621,22 +762,38 @@ export default function CustomerPortal() {
           );
         })()}
 
-                <div className="card overflow-hidden">
+        <div className="card overflow-hidden">
           <div className="px-5 py-3 border-b border-surface-4" style={{ background: 'linear-gradient(135deg, #fef3c7, #fff7ed)' }}>
-            <span className="text-xs font-bold text-amber-700 uppercase tracking-widest">⚠️ Important Terms & Conditions</span>
+            <span className="text-xs font-bold text-amber-700 uppercase tracking-widest">IMPORTANT NOTE ( নিয়মাবলী )</span>
           </div>
-          <div className="px-5 py-4 space-y-3 text-xs text-slate-500 leading-relaxed">
-            <p><strong>1.</strong> You will have to pay even if the mobile phone is <strong>Stolen, Lost, or Damaged</strong>.</p>
-            <p><strong>2.</strong> If you do not send money by <strong>12 PM</strong> on EMI date, the phone will be <strong className="text-crimson-400">Auto Locked</strong>. Pay ₹450 fine + EMI amount.</p>
-            <p><strong>3.</strong> The ₹450 fine must be paid within the month. Otherwise <strong>₹25 extra every 7 days</strong>.</p>
-            <p><strong>4.</strong> This is NOT auto debit. Pay cash to retailer or online (QR on EMI Card).</p>
-            <p><strong>5.</strong> If you pay online, call <strong>7003617029</strong> and send screenshot with your name.</p>
-            <p><strong>6.</strong> Cannot Reset or Sell phone during EMI. <strong className="text-crimson-400">₹500 minimum charge</strong> if formatted.</p>
-            <p><strong>7.</strong> Bill/Box given <strong>7 days after EMI complete</strong>.</p>
-            <p><strong>8.</strong> Broken or burned phone has <strong>no warranty</strong>.</p>
-            <p><strong>9.</strong> Payment updates in <strong>1-3 days</strong>. Dispute → call retailer.</p>
+          <div className="px-5 py-4 text-xs text-slate-500 leading-relaxed">
+            <ol className="list-decimal pl-4 space-y-2">
+              <li>মোবাইল চুরি, হারানো বা খারাপ হয়ে গেলেও EMI দিতে হবে।</li>
+              <li>নিদির্ষ্ট তারিখের রাত্রি ১২ টার মধ্যে EMI জমা না পড়লে Phone Auto Lock হবে। 450/- টাকা ফাইন চার্জ সহ EMI দিতে হবে।</li>
+              <li>যে মাসের Fine সেই মাসের মধ্যেই পেমেন্ট করতে হবে। তা না হলে, ওই মাসের EMI Date এর ৩০ দিন পর থেকে সপ্তাহে 25/- টাকা করে (Base Fine 450/-) এর সাথে যোগ হবে।</li>
+              <li>প্রতি মাসের EMI প্রতি মাসেই পেমেন্ট করতে হবে। আগের মাসের EMI বাকি রেখে বর্তমান মাসের EMI দেওয়া যাবে না।</li>
+              <li>EMI চলা-কালীন মোবাইল বিক্রি / Reset করা যাবে না। Reset / Format করে ফেললে Minimum 500/- টাকা চার্জ পড়বে।</li>
+              <li>EMI মিটে যাবার ৭ দিন পর Original Bill &amp; Phone Box পাওয়া যাবে।</li>
+              <li>EMI এর টাকা আপনার ব্যাঙ্ক থেকে Auto Debit হবে না। Cash অথবা কার্ডে দেওয়া QR Code এ পেমেন্ট করতে পারেন।</li>
+              <li>Online এ টাকা পাঠালে (7003617029) - এই নম্বরে ফোন করে জানাতে পারেন, অথবা কার্ডের প্রথম পৃষ্টার ছবি আর টাকা পাঠানোর Screen Shot টা পাঠাবেন।</li>
+              <li>Portal এ পেমেন্ট Update হতে ১ - ২ দিন সময় লাগতে পারে। তারপর ও যদি না হয় দোকানে যোগাযোগ করুন।</li>
+              <li>ফোন ভেঙে যাওয়া, জলে পড়ে যাওয়া, - এগুলো হলে কোন Guarantee / Warranty পাওয়া যায় না।</li>
+            </ol>
           </div>
         </div>
+        {dueSummary.totalDue > 0 && (
+          <div className="fixed bottom-10 left-0 right-0 z-[100] md:hidden border-t border-surface-4 bg-white/95 backdrop-blur-md px-4 py-3 safe-bottom">
+            <div className="max-w-2xl mx-auto flex items-center gap-3">
+              <div className="flex-1">
+                <p className="text-[11px] text-slate-500 uppercase tracking-wide">Total Amount</p>
+                <p className="font-num text-lg font-bold text-ink">{fmt(dueSummary.totalDue)}</p>
+              </div>
+              <button onClick={handleOnlinePay} className="btn-primary px-5" disabled={isLaunchingUpi}>
+                {isLaunchingUpi ? 'Opening...' : 'Pay Online'}
+              </button>
+            </div>
+          </div>
+        )}
         <p className="text-center text-xs text-slate-700 pb-4">Read-only view · TelePoint EMI Portal</p>
       </div>
     </div>

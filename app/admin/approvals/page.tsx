@@ -258,6 +258,7 @@ export default function ApprovalsPage() {
             {loading ? 'Loading…' : 'Load'}
           </button>
           </div>
+        </div>
 
         {/* Search */}
         <div className="mb-6">
