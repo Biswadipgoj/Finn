@@ -25,8 +25,9 @@ export default function EMIScheduleTable({ emis, isAdmin, nextUnpaidNo, onRefres
   const [fineOverride, setFineOverride] = useState('');
   const [dateOverride, setDateOverride] = useState('');
   const [saving, setSaving] = useState(false);
+  const sortedEmis = [...emis].sort((a, b) => new Date(a.due_date).getTime() - new Date(b.due_date).getTime());
 
-  const paidCount = emis.filter(e => e.status === 'APPROVED').length;
+  const paidCount = sortedEmis.filter(e => e.status === 'APPROVED').length;
 
   async function saveEdit(emi: EMISchedule) {
     setSaving(true);
@@ -45,11 +46,11 @@ export default function EMIScheduleTable({ emis, isAdmin, nextUnpaidNo, onRefres
         <p className="text-xs font-bold text-ink-muted uppercase tracking-widest">EMI Schedule</p>
         <div className="flex gap-2 text-xs">
           <span className="badge-green">{paidCount} paid</span>
-          <span className="badge-gray">{emis.length} total</span>
+          <span className="badge-gray">{sortedEmis.length} total</span>
         </div>
       </div>
 
-      <div className="overflow-x-auto">
+      <div className="hidden md:block overflow-x-auto">
         <table className="tbl">
           <thead>
             <tr>
@@ -64,7 +65,7 @@ export default function EMIScheduleTable({ emis, isAdmin, nextUnpaidNo, onRefres
             </tr>
           </thead>
           <tbody>
-            {emis.map(emi => {
+            {sortedEmis.map(emi => {
               const today = new Date();
               const dueDate = new Date(emi.due_date);
               const isOverdue = emi.status === 'UNPAID' && dueDate < today;
@@ -72,7 +73,7 @@ export default function EMIScheduleTable({ emis, isAdmin, nextUnpaidNo, onRefres
               const editing = editingId === emi.id;
 
               // Fine: show fine_amount if set, else default if overdue
-              const maxEmiNo = emis.length > 0 ? Math.max(...emis.map(e => e.emi_no)) : 0;
+              const maxEmiNo = sortedEmis.length > 0 ? Math.max(...sortedEmis.map(e => e.emi_no)) : 0;
               const isLastEmi = emi.emi_no === maxEmiNo; // position-based, not status-based
               const autoFine = isOverdue ? calculateSingleEmiFine(emi.due_date, isLastEmi, defaultFineAmount) : 0;
               const displayFine = Math.max(autoFine, emi.fine_amount || 0);
@@ -164,6 +165,34 @@ export default function EMIScheduleTable({ emis, isAdmin, nextUnpaidNo, onRefres
             })}
           </tbody>
         </table>
+      </div>
+      <div className="md:hidden divide-y divide-surface-3">
+        {sortedEmis.map(emi => {
+          const today = new Date();
+          const dueDate = new Date(emi.due_date);
+          const isOverdue = emi.status === 'UNPAID' && dueDate < today;
+          const isNext = emi.emi_no === nextUnpaidNo;
+          const maxEmiNo = sortedEmis.length > 0 ? Math.max(...sortedEmis.map(e => e.emi_no)) : 0;
+          const isLastEmi = emi.emi_no === maxEmiNo;
+          const autoFine = isOverdue ? calculateSingleEmiFine(emi.due_date, isLastEmi, defaultFineAmount) : 0;
+          const displayFine = Math.max(autoFine, emi.fine_amount || 0);
+          return (
+            <div key={emi.id} className={`p-4 space-y-2 ${isOverdue ? 'bg-danger-light/40' : isNext ? 'bg-brand-50/50' : ''}`}>
+              <div className="flex items-center justify-between">
+                <p className="font-semibold text-ink">EMI #{emi.emi_no}</p>
+                {emi.status === 'APPROVED' && <span className="badge-blue">✓ Paid</span>}
+                {emi.status === 'PENDING_APPROVAL' && <span className="badge-yellow">⏳ Pending</span>}
+                {emi.status === 'UNPAID' && <span className={`badge ${isOverdue ? 'badge-red' : 'badge-gray'}`}>{isOverdue ? 'Overdue' : 'Unpaid'}</span>}
+              </div>
+              <div className="grid grid-cols-2 gap-2 text-xs">
+                <p className="text-ink-muted">Due Date</p><p className="text-right num">{format(dueDate, 'd MMM yyyy')}</p>
+                <p className="text-ink-muted">Amount</p><p className="text-right num">{fmt(emi.amount)}</p>
+                <p className="text-ink-muted">Fine</p><p className="text-right num">{displayFine > 0 ? fmt(displayFine) : '—'}</p>
+                <p className="text-ink-muted">Paid On</p><p className="text-right num">{emi.paid_at ? format(new Date(emi.paid_at), 'd MMM yy') : '—'}</p>
+              </div>
+            </div>
+          );
+        })}
       </div>
     </div>
   );

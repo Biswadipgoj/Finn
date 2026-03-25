@@ -175,7 +175,7 @@ export default function RetailerDashboard() {
     <div className="min-h-screen page-bg">
       <NavBar role="retailer" userName={retailer?.name || 'Retailer'} />
 
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8 pb-24">
         {/* Welcome Banner */}
         <div className="card p-5 mb-8 flex items-center justify-between">
           <div>
@@ -427,7 +427,11 @@ export default function RetailerDashboard() {
           isAdmin={false}
         />
       )}
-    </div>
+      {retailer && (
+        <div className="fixed bottom-0 left-0 right-0 z-20 bg-amber-100 border-t border-amber-300 text-amber-900 text-[11px] sm:text-xs font-medium px-3 py-2 text-center">
+          সময়মতো EMI সংগ্রহ করে ডিউ ডেটের আগে সাবমিট করুন। সময়মতো পেমেন্ট না হলে Auto-fine গণনা হয়ে কাস্টমার পোর্টালে দেখাবে।
+        </div>
+      )}
       <BottomNav role="retailer" />
     </div>
   );

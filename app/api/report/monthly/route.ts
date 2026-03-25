@@ -62,10 +62,18 @@ export async function GET(req: NextRequest) {
     csvRows.push(`${retailer.name.toUpperCase()} - EMI COLLECTION SHEET FOR THE MONTH OF ${monthLabel},,,,,,,,,,,,,,,`);
     csvRows.push('IMEI NO,SR NO.,CUST NAME,CUSTOMER NUMBER,ALTARNET NUMBER,1st EMI,Date,EMI Amount,1st emi charge,remarks,,,,,,');
 
+    const customersSorted = [...customers].sort((a, b) => {
+      const aFirst = (allEmis || []).filter(e => e.customer_id === a.id).sort((x, y) => new Date(x.due_date).getTime() - new Date(y.due_date).getTime())[0];
+      const bFirst = (allEmis || []).filter(e => e.customer_id === b.id).sort((x, y) => new Date(x.due_date).getTime() - new Date(y.due_date).getTime())[0];
+      return new Date(aFirst?.due_date || '9999-12-31').getTime() - new Date(bFirst?.due_date || '9999-12-31').getTime();
+    });
+
     let srNo = 0;
-    for (const cust of customers) {
+    for (const cust of customersSorted) {
       srNo++;
-      const custEmis = (allEmis || []).filter(e => e.customer_id === cust.id);
+      const custEmis = (allEmis || [])
+        .filter(e => e.customer_id === cust.id)
+        .sort((x, y) => new Date(x.due_date).getTime() - new Date(y.due_date).getTime());
       const firstEmi = custEmis[0];
       const custPayments = (paymentReqs || []).filter(p => p.customer_id === cust.id);
 
