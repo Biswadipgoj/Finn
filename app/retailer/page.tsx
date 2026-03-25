@@ -175,7 +175,7 @@ export default function RetailerDashboard() {
     <div className="min-h-screen page-bg">
       <NavBar role="retailer" userName={retailer?.name || 'Retailer'} />
 
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8 pb-24">
         {/* Welcome Banner */}
         <div className="card p-5 mb-8 flex items-center justify-between">
           <div>
