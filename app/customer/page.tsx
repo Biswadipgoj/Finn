@@ -656,6 +656,49 @@ export default function CustomerPortal() {
           );
         })()}
 
+        {/* Fine History */}
+        {(() => {
+          const fineRows = sortedEmis
+            .filter(e => (e.fine_amount || 0) > 0 || (e.fine_paid_amount || 0) > 0)
+            .map(e => {
+              const total = Number(e.fine_amount || 0);
+              const paid = Number(e.fine_paid_amount || 0);
+              return {
+                id: e.id,
+                emiNo: e.emi_no,
+                detectedAt: format(new Date(e.due_date), 'd MMM yyyy'),
+                total,
+                paid,
+                pending: Math.max(0, total - paid),
+                status: total > 0 && paid >= total ? 'PAID' : 'PENDING',
+              };
+            });
+          if (!fineRows.length) return null;
+          return (
+            <div className="card overflow-hidden">
+              <div className="px-5 py-3 border-b border-surface-4">
+                <span className="text-xs font-semibold text-slate-400 uppercase tracking-widest">🧾 Fine History</span>
+              </div>
+              <div className="divide-y divide-surface-3">
+                {fineRows.map(r => (
+                  <div key={r.id} className="px-5 py-3 text-xs">
+                    <div className="flex items-center justify-between">
+                      <p className="font-semibold text-ink">EMI #{r.emiNo}</p>
+                      <span className={r.status === 'PAID' ? 'badge-approved' : 'badge-pending'}>{r.status}</span>
+                    </div>
+                    <div className="mt-1.5 grid grid-cols-2 gap-1.5">
+                      <p className="text-slate-500">Detected Date</p><p className="text-right font-num">{r.detectedAt}</p>
+                      <p className="text-slate-500">Total Fine</p><p className="text-right font-num">{fmt(r.total)}</p>
+                      <p className="text-slate-500">Paid</p><p className="text-right font-num text-jade-400">{fmt(r.paid)}</p>
+                      <p className="text-slate-500">Pending</p><p className="text-right font-num text-crimson-400">{fmt(r.pending)}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          );
+        })()}
+
         {/* 1st EMI Charge status */}
         {(customer?.first_emi_charge_amount || 0) > 0 && (
           <div className={`glass-card p-4 flex items-center justify-between ${customer?.first_emi_charge_paid_at ? 'border-jade-500/20' : 'border-gold-500/20'}`}>

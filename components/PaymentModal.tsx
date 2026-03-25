@@ -45,6 +45,9 @@ export default function PaymentModal({ customer, emis, breakdown, onClose, onSub
   const fineAmt = collectFine ? (editFine !== '' ? Math.max(0, parseFloat(editFine) || 0) : scheduledFine) : 0;
   const chargeAmt = collectCharge ? (editCharge !== '' ? Math.max(0, parseFloat(editCharge) || 0) : scheduledCharge) : 0;
   const total = emiAmt + fineAmt + chargeAmt;
+  const missingRetailPin = !isAdmin && !retailerPin.trim();
+  const missingUtr = mode === 'UPI' && !utr.trim();
+  const cannotSubmit = loading || total <= 0 || missingRetailPin || missingUtr || (collectEmi && !selectedEmi);
 
   // Auto-tick what's due when fine/charge changes
   useEffect(() => { setCollectFine(scheduledFine > 0); setCollectCharge(scheduledCharge > 0); }, [scheduledFine, scheduledCharge]);
@@ -197,9 +200,11 @@ export default function PaymentModal({ customer, emis, breakdown, onClose, onSub
           {/* Mode */}
           <div className="flex gap-2">{(['CASH','UPI'] as const).map(m => (<button key={m} type="button" onClick={() => setMode(m)} className={`flex-1 py-3 rounded-xl border-2 text-sm font-semibold transition-all ${mode === m ? (m === 'CASH' ? 'border-success bg-success-light text-success' : 'border-info bg-info-light text-info') : 'border-surface-4 text-ink-muted'}`}>{m === 'CASH' ? '💵 Cash' : '📱 UPI'}</button>))}</div>
           {mode === 'UPI' && <input type="text" value={utr} onChange={e => setUtr(e.target.value)} placeholder="UTR / Reference *" className={`input ${!utr.trim() ? 'border-warning' : ''}`} />}
+          {missingUtr && <p className="text-[11px] text-warning">UPI mode requires UTR / Reference to enable Record Payment.</p>}
           {mode === 'UPI' && qrDataUrl && <div className="flex flex-col items-center"><img src={qrDataUrl} alt="QR" className="w-44 h-44 rounded-xl border border-surface-4" /><p className="num text-xs text-ink-muted mt-1">{UPI_ID}</p></div>}
 
           {!isAdmin && <input type="password" value={retailerPin} onChange={e => setRetailerPin(e.target.value)} placeholder="Retail PIN *" inputMode="numeric" className="input" />}
+          {missingRetailPin && <p className="text-[11px] text-warning">Retail PIN is required to submit payment.</p>}
           <textarea value={notes} onChange={e => setNotes(e.target.value)} rows={2} placeholder="Notes (optional)" className="input resize-none" />
 
           {/* Editable amounts */}
