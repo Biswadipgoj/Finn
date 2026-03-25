@@ -10,7 +10,7 @@ import EMIScheduleTable from '@/components/EMIScheduleTable';
 import DueBreakdownPanel from '@/components/DueBreakdownPanel';
 import PaymentModal from '@/components/PaymentModal';
 import toast from 'react-hot-toast';
-import { format } from 'date-fns';
+import { format, differenceInDays } from 'date-fns';
 import Link from 'next/link';
 import { calculateTotalFineFromEmis } from '@/lib/fineCalc';
 import BottomNav from '@/components/BottomNav';
@@ -382,6 +382,34 @@ export default function RetailerDashboard() {
             )}
 
             <CustomerDetailPanel customer={selectedCustomer} paidCount={paidCount} totalEmis={selectedCustomer.emi_tenure} />
+
+            {breakdown && (() => {
+              const daysLeft = breakdown.next_emi_due_date ? differenceInDays(new Date(breakdown.next_emi_due_date), new Date()) : null;
+              return (
+                <div className="space-y-2">
+                  {breakdown.fine_due > 0 && (
+                    <div className="alert-red border-2">
+                      <p className="font-bold text-base text-crimson-400">⚠️ Fine Pending</p>
+                      <p className="text-sm font-semibold text-ink-muted mt-0.5">Pending fine: {fmt(breakdown.fine_due)}</p>
+                    </div>
+                  )}
+                  {(breakdown.first_emi_charge_due ?? 0) > 0 && (
+                    <div className="alert-gold border-2">
+                      <p className="font-bold text-base text-gold-400">⚠️ 1ST EMI CHARGE Pending</p>
+                      <p className="text-sm font-semibold text-ink-muted mt-0.5">Pending amount: {fmt(breakdown.first_emi_charge_due || 0)}</p>
+                    </div>
+                  )}
+                  {daysLeft !== null && daysLeft >= 0 && daysLeft <= 5 && (
+                    <div className="alert-blue border-2">
+                      <p className="font-bold text-base text-sapphire-400">🔔 EMI Upcoming in {daysLeft} day{daysLeft === 1 ? '' : 's'}</p>
+                      <p className="text-sm font-semibold text-ink-muted mt-0.5">
+                        EMI #{breakdown.next_emi_no ?? '—'} due on {breakdown.next_emi_due_date ? format(new Date(breakdown.next_emi_due_date), 'd MMM yyyy') : '—'}
+                      </p>
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
 
             {breakdown && <DueBreakdownPanel breakdown={breakdown} />}
 
