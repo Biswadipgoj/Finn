@@ -143,6 +143,29 @@ body {
     max-height: 100dvh !important;
     height: 100dvh;
   }
+
+  .data-table,
+  .tbl,
+  .data-table tbody,
+  .tbl tbody,
+  .data-table tr,
+  .tbl tr,
+  .data-table td,
+  .tbl td {
+    display: block;
+    width: 100%;
+  }
+
+  .data-table thead,
+  .tbl thead {
+    display: none;
+  }
+
+  .data-table tr,
+  .tbl tr {
+    border-bottom: 1px solid #e2e8f0;
+    padding: 0.5rem 0.25rem;
+  }
 }
 
 /* Safe area for bottom nav */

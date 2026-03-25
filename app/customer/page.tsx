@@ -226,7 +226,7 @@ export default function CustomerPortal() {
       `Total Amount: ${fmt(totalAmount)}`,
       `Date: ${format(new Date(), 'd MMM yyyy, h:mm a')}`,
       'Payment Mode: UPI',
-      'UPI Receiver: biswajit.khanra82@axl',
+      'UPI Receiver: 7003617029@upi',
     ];
     rows.forEach((row, i) => ctx.fillText(row, 80, 230 + i * 90));
     return await new Promise<File | null>((resolve) => {
@@ -273,7 +273,7 @@ export default function CustomerPortal() {
   async function handleOnlinePay() {
     if (!customer || dueSummary.totalDue <= 0) return;
     const amount = Number(dueSummary.totalDue.toFixed(2));
-    const upiUrl = `upi://pay?pa=biswajit.khanra82@axl&pn=TelePoint&am=${amount}&cu=INR&tn=${encodeURIComponent(`${customer.imei}-${customer.customer_name}`)}`;
+    const upiUrl = `upi://pay?pa=7003617029@upi&pn=TelePoint&am=${amount}&cu=INR&tn=${encodeURIComponent(`EMI ${customer.customer_name}`)}`;
     setPendingWhatsappShare(true);
     setIsLaunchingUpi(true);
     window.location.href = upiUrl;
@@ -782,7 +782,7 @@ export default function CustomerPortal() {
           </div>
         </div>
         {dueSummary.totalDue > 0 && (
-          <div className="fixed bottom-10 left-0 right-0 z-[100] md:hidden border-t border-surface-4 bg-white/95 backdrop-blur-md px-4 py-3 safe-bottom">
+          <div className="fixed bottom-0 left-0 right-0 z-[100] md:hidden border-t border-surface-4 bg-white/95 backdrop-blur-md px-4 py-3 safe-bottom">
             <div className="max-w-2xl mx-auto flex items-center gap-3">
               <div className="flex-1">
                 <p className="text-[11px] text-slate-500 uppercase tracking-wide">Total Amount</p>
