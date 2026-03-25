@@ -222,15 +222,9 @@ export default function PaymentModal({ customer, emis, breakdown, onClose, onSub
           </div>
 
         </div>
-        <div className="sticky bottom-0 z-30 bg-white border-t border-surface-4 p-3 space-y-2">
-          <div className="flex items-center justify-between px-1">
-            <span className="text-xs text-ink-muted uppercase tracking-wide">Total Amount</span>
-            <span className="num font-bold text-brand-600">{fmt(total)}</span>
-          </div>
-          <div className="flex gap-3">
-            <button onClick={onClose} className="btn-secondary flex-1 py-3">Cancel</button>
-            <button onClick={handleSubmit} disabled={cannotSubmit} className="btn-primary flex-1 py-3">{loading ? '...' : isAdmin ? '✓ Record' : '→ Submit'}</button>
-          </div>
+        <div className="sticky bottom-0 z-20 bg-white border-t border-surface-4 p-3 flex gap-3">
+          <button onClick={onClose} className="btn-secondary flex-1 py-3">Cancel</button>
+          <button onClick={handleSubmit} disabled={loading} className="btn-primary flex-1 py-3">{loading ? '...' : isAdmin ? '✓ Record' : '→ Submit'}</button>
         </div>
       </div>
     </div>

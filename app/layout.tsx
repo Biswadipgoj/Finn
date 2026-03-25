@@ -20,7 +20,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
       </head>
-      <body className="overflow-x-hidden">
+      <body className="overflow-x-hidden pb-20">
         {children}
         <Toaster
           position="top-center"
@@ -30,6 +30,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             error: { style: { background: '#dc2626', color: 'white' }, iconTheme: { primary: 'white', secondary: '#dc2626' } },
           }}
         />
+        <div className="fixed bottom-0 left-0 right-0 z-[90] bg-amber-100 border-t border-amber-300 text-amber-900 text-[11px] sm:text-xs font-medium px-3 py-2 text-center">
+          Time to time EMI collect and submit before due day. Auto-fine is detected and visible in the customer portal if payment is not submitted on time.
+        </div>
         <footer className="text-center py-4 text-xs text-ink-muted/50 no-print">Created by DIP</footer>
       </body>
     </html>
