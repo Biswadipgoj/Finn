@@ -444,12 +444,12 @@ export default function CustomerFormModal({
                         type="number"
                         value={form.disburse_amount}
                         onChange={e => set('disburse_amount', e.target.value)}
-                        placeholder={autoDisburse > 0 ? `Auto: ${autoDisburse.toLocaleString('en-IN')}` : '0'}
+                        placeholder={autoDisburse > 0 ? `Auto: ${formatCurrency(autoDisburse)}` : '0'}
                         className="input"
                       />
                       {autoDisburse > 0 && !form.disburse_amount && (
                         <p className="text-xs text-ink-muted mt-1">
-                          Auto-calculated: ₹{autoDisburse.toLocaleString('en-IN')}
+                          Auto-calculated: {formatCurrency(autoDisburse)}
                         </p>
                       )}
                     </div>
@@ -573,7 +573,7 @@ export default function CustomerFormModal({
                       <div>
                         <p className="text-xs text-ink-muted mb-1">Monthly EMI</p>
                         <p className="num text-brand-700 font-bold">
-                          ₹{parseFloat(form.emi_amount || '0').toLocaleString('en-IN')}
+                          {formatCurrency(parseFloat(form.emi_amount || '0'))}
                         </p>
                       </div>
                       <div>
@@ -583,7 +583,7 @@ export default function CustomerFormModal({
                       <div>
                         <p className="text-xs text-ink-muted mb-1">Total EMI Value</p>
                         <p className="num text-brand-700 font-bold">
-                          ₹{(parseFloat(form.emi_amount || '0') * parseInt(form.emi_tenure || '1')).toLocaleString('en-IN')}
+                          {formatCurrency(parseFloat(form.emi_amount || '0') * parseInt(form.emi_tenure || '1'))}
                         </p>
                       </div>
                     </div>

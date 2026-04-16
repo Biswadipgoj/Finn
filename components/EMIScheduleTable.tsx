@@ -5,6 +5,7 @@ import { EMISchedule } from '@/lib/types';
 import { format, differenceInDays, addDays } from 'date-fns';
 import toast from 'react-hot-toast';
 import { calculateSingleEmiFine } from '@/lib/fineCalc';
+import { formatCurrency, formatDateOnly, formatDateTime } from '@/lib/formatters';
 
 interface Props {
   emis: EMISchedule[];
@@ -27,9 +28,6 @@ type EditForm = {
   fine_waived: boolean;
 };
 
-function fmt(n: number) {
-  return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', minimumFractionDigits: 0 }).format(n);
-}
 
 function toDateInput(value?: string | null) {
   if (!value) return '';
@@ -188,7 +186,7 @@ export default function EMIScheduleTable({ emis, isAdmin, nextUnpaidNo, onRefres
   return (
     <div className="card overflow-hidden">
       <div className="flex items-center justify-between px-5 py-3 border-b border-surface-4 bg-surface-2">
-        <p className="text-xs font-bold text-ink-muted uppercase tracking-widest">EMI Schedule</p>
+        <p className="text-sm font-semibold text-ink-muted">EMI Schedule</p>
         <div className="flex gap-2 text-xs">
           <span className="badge-green">{paidCount} paid</span>
           <span className="badge-gray">{sortedEmis.length} total</span>

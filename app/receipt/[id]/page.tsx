@@ -3,10 +3,8 @@ import { createServiceClient } from '@/lib/supabase/server';
 import { format } from 'date-fns';
 import { notFound } from 'next/navigation';
 import PrintButton from '@/components/PrintButton';
+import { formatCurrency, formatDateTime } from '@/lib/formatters';
 
-function fmt(n: number) {
-  return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', minimumFractionDigits: 0 }).format(n);
-}
 
 type Status = 'PENDING' | 'APPROVED' | 'REJECTED';
 
@@ -129,21 +127,22 @@ export default async function ReceiptPage({ params }: { params: { id: string } }
             {/* Payment breakdown */}
             <Section title="PAYMENT BREAKDOWN">
               {items.map(i => (
-                <KV key={i.emi_no} label={`EMI #${i.emi_no}`} value={fmt(i.amount)} mono />
+                <KV key={i.emi_no} label={`EMI #${i.emi_no}`} value={formatCurrency(i.amount)} mono />
               ))}
               {items.length === 0 && (request.total_emi_amount ?? 0) > 0 && (
-                <KV label="EMI Amount" value={fmt(request.total_emi_amount)} mono />
+                <KV label="EMI Amount" value={formatCurrency(request.total_emi_amount)} mono />
               )}
               {(request.first_emi_charge_amount ?? 0) > 0 && (
-                <KV label="1st EMI Charge ⭐" value={fmt(request.first_emi_charge_amount)} mono color="#92400e" />
+                <KV label="1st EMI Charge ⭐" value={formatCurrency(request.first_emi_charge_amount)} mono color="#92400e" />
               )}
               {(request.fine_amount ?? 0) > 0 && (
-                <KV label="Late Fine ⚠️" value={fmt(request.fine_amount)} mono color="#991b1b" />
+                <KV label="Late Fine ⚠️" value={formatCurrency(request.fine_amount)} mono color="#991b1b" />
               )}
               <div style={{ height: '1px', background: '#e2e8f0', margin: '0.75rem 0' }} />
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <span style={{ fontWeight: 800, fontSize: '1rem', color: '#1e293b' }}>Total Paid</span>
                 <span style={{ fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace', fontWeight: 800, fontSize: '1.5rem', color: '#ca8a04' }}>
+                  {formatCurrency(request.total_amount)}
                   {fmt(request.total_amount)}
                 </span>
               </div>

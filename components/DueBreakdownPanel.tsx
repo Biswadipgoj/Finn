@@ -2,10 +2,8 @@
 
 import { DueBreakdown } from '@/lib/types';
 import { format, addDays, differenceInDays } from 'date-fns';
+import { formatCurrency, formatDateOnly } from '@/lib/formatters';
 
-function fmt(n: number) {
-  return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', minimumFractionDigits: 0 }).format(n);
-}
 
 export default function DueBreakdownPanel({ breakdown }: { breakdown: DueBreakdown }) {
   if (!breakdown || !breakdown.next_emi_no) return null;
@@ -18,17 +16,17 @@ export default function DueBreakdownPanel({ breakdown }: { breakdown: DueBreakdo
 
   return (
     <div className="card p-5 border-l-4 border-brand-400 bg-brand-50/50">
-      <p className="text-xs font-bold text-ink-muted uppercase tracking-widest mb-4">Next Payment Due</p>
+      <p className="text-sm font-semibold text-ink-muted mb-4">Next Payment Due</p>
       <div className="space-y-2.5">
         {(breakdown.selected_emi_amount ?? breakdown.next_emi_amount ?? 0) > 0 && (
-          <Row label={`EMI #${breakdown.next_emi_no}`} value={fmt(breakdown.selected_emi_amount ?? breakdown.next_emi_amount ?? 0)} />
+          <Row label={`EMI #${breakdown.next_emi_no}`} value={formatCurrency(breakdown.selected_emi_amount ?? breakdown.next_emi_amount ?? 0)} />
         )}
         {breakdown.first_emi_charge_due > 0 && (
-          <Row label="1st EMI Charge ⭐" value={fmt(breakdown.first_emi_charge_due)} accent="warning" />
+          <Row label="1st EMI Charge ⭐" value={formatCurrency(breakdown.first_emi_charge_due)} accent="warning" />
         )}
         {breakdown.fine_due > 0 && (
           <div>
-            <Row label="Late Fine ⚠️" value={fmt(breakdown.fine_due)} accent="danger" />
+            <Row label="Late Fine ⚠️" value={formatCurrency(breakdown.fine_due)} accent="danger" />
             {fineStartDate && (
               <p className="text-[11px] text-danger/70 mt-0.5 ml-0.5">
                 Fine from: {format(fineStartDate, 'd MMM yyyy')}
@@ -39,7 +37,7 @@ export default function DueBreakdownPanel({ breakdown }: { breakdown: DueBreakdo
         <div className="h-px bg-surface-4 my-1" />
         <div className="flex justify-between items-center">
           <span className="font-bold text-ink text-base">Total Payable</span>
-          <span className="num font-bold text-2xl text-brand-600">{fmt(breakdown.total_payable)}</span>
+          <span className="num font-bold text-2xl text-brand-600">{formatCurrency(breakdown.total_payable)}</span>
         </div>
         {dueDate && (
           <div className="space-y-0.5">

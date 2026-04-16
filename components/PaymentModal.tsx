@@ -5,10 +5,10 @@ import toast from 'react-hot-toast';
 import { format } from 'date-fns';
 import { calculateTotalFineFromEmis } from '@/lib/fineCalc';
 import FineSummaryPanel from './FineSummaryPanel';
+import { formatCurrency, formatDateTime } from '@/lib/formatters';
 
 interface Props { customer: Customer; emis: EMISchedule[]; breakdown: DueBreakdown | null; onClose: () => void; onSubmitted: () => void; isAdmin?: boolean; }
 const UPI_ID = 'biswajit.khanra82@axl';
-function fmt(n: number) { return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', minimumFractionDigits: 0 }).format(n); }
 
 export default function PaymentModal({ customer, emis, breakdown, onClose, onSubmitted, isAdmin }: Props) {
   const unpaidEmis = emis.filter(e => e.status === 'UNPAID');
@@ -119,13 +119,13 @@ export default function PaymentModal({ customer, emis, breakdown, onClose, onSub
             <div className="card bg-surface-2 p-4 space-y-2">
               <div className="flex justify-between text-sm"><span className="text-ink-muted">Customer</span><span className="font-semibold text-ink">{customer.customer_name}</span></div>
               <div className="flex justify-between text-sm"><span className="text-ink-muted">IMEI</span><span className="num text-ink">{customer.imei}</span></div>
-              {emiAmt > 0 && <div className="flex justify-between text-sm"><span className="text-ink-muted">EMI #{selectedEmiNo}</span><span className="num font-semibold">{fmt(emiAmt)}</span></div>}
-              {chargeAmt > 0 && <div className="flex justify-between text-sm"><span className="text-warning">1st Charge</span><span className="num text-warning">{fmt(chargeAmt)}</span></div>}
-              {fineAmt > 0 && <div className="flex justify-between text-sm"><span className="text-danger">Fine</span><span className="num text-danger">{fmt(fineAmt)}</span></div>}
+              {emiAmt > 0 && <div className="flex justify-between text-sm"><span className="text-ink-muted">EMI #{selectedEmiNo}</span><span className="num font-semibold">{formatCurrency(emiAmt)}</span></div>}
+              {chargeAmt > 0 && <div className="flex justify-between text-sm"><span className="text-warning">1st Charge</span><span className="num text-warning">{formatCurrency(chargeAmt)}</span></div>}
+              {fineAmt > 0 && <div className="flex justify-between text-sm"><span className="text-danger">Fine</span><span className="num text-danger">{formatCurrency(fineAmt)}</span></div>}
               <div className="h-px bg-surface-4" />
-              <div className="flex justify-between"><span className="font-bold">Total</span><span className="num text-xl font-bold text-brand-600">{fmt(total)}</span></div>
+              <div className="flex justify-between"><span className="font-bold">Total</span><span className="num text-xl font-bold text-brand-600">{formatCurrency(total)}</span></div>
             </div>
-            <button onClick={() => { const m = [`🧾 *TelePoint EMI Receipt*`,'',`👤 ${customer.customer_name}`,`📱 ${customer.mobile}`,`🔢 IMEI: ${customer.imei}`,'',emiAmt>0?`💳 EMI #${selectedEmiNo}: ${fmt(emiAmt)}`:'',chargeAmt>0?`⭐ Charge: ${fmt(chargeAmt)}`:'',fineAmt>0?`⚠️ Fine: ${fmt(fineAmt)}`:'',`💰 *Total: ${fmt(total)}*`,`🏷️ ${mode}`,`📅 ${format(now,'d MMM yyyy, h:mm a')}`,'','— TelePoint'].filter(Boolean).join('\n'); window.open(`https://wa.me/?text=${encodeURIComponent(m)}`,'_blank'); }} className="btn w-full py-3 bg-green-500 hover:bg-green-600 text-white">📤 Share WhatsApp</button>
+            <button onClick={() => { const m = [`🧾 *TelePoint EMI Receipt*`,'',`👤 ${customer.customer_name}`,`📱 ${customer.mobile}`,`🔢 IMEI: ${customer.imei}`,'',emiAmt>0?`💳 EMI #${selectedEmiNo}: ${formatCurrency(emiAmt)}`:'',chargeAmt>0?`⭐ Charge: ${formatCurrency(chargeAmt)}`:'',fineAmt>0?`⚠️ Fine: ${formatCurrency(fineAmt)}`:'',`💰 *Total: ${formatCurrency(total)}*`,`🏷️ ${mode}`,`📅 ${format(now,'d MMM yyyy, h:mm a')}`,'','— TelePoint'].filter(Boolean).join('\n'); window.open(`https://wa.me/?text=${encodeURIComponent(m)}`,'_blank'); }} className="btn w-full py-3 bg-green-500 hover:bg-green-600 text-white">📤 Share WhatsApp</button>
             <button onClick={() => { onSubmitted(); onClose(); }} className="btn-ghost w-full py-2.5">Close</button>
           </div>
         </div>
@@ -158,7 +158,7 @@ export default function PaymentModal({ customer, emis, breakdown, onClose, onSub
                 <input type="checkbox" checked={collectEmi} onChange={e => setCollectEmi(e.target.checked)} className="w-5 h-5 accent-brand-500 rounded" />
                   <div><p className="text-sm font-semibold text-ink">EMI #{selectedEmiNo || '—'}</p><p className="text-xs text-ink-muted">EMI Amount: {fmt(scheduledEmiAmount)}</p></div>
               </div>
-              <span className="num font-semibold text-ink">{fmt(scheduledEmiAmount)}</span>
+              <span className="num font-semibold text-ink">{formatCurrency(scheduledEmiAmount)}</span>
             </label>
             {scheduledFine > 0 && (
               <label className={`flex items-center justify-between p-3 rounded-xl border-2 cursor-pointer transition-all ${collectFine ? 'border-danger bg-danger-light' : 'border-surface-4'}`}>
@@ -166,7 +166,7 @@ export default function PaymentModal({ customer, emis, breakdown, onClose, onSub
                   <input type="checkbox" checked={collectFine} onChange={e => setCollectFine(e.target.checked)} className="w-5 h-5 accent-red-500 rounded" />
                   <div><p className="text-sm font-semibold text-danger">Fine Due</p><p className="text-xs text-ink-muted">Calculated based on payment timing</p></div>
                 </div>
-                <span className="num font-semibold text-danger">{fmt(scheduledFine)}</span>
+                <span className="num font-semibold text-danger">{formatCurrency(scheduledFine)}</span>
               </label>
             )}
             {scheduledCharge > 0 && (
@@ -175,7 +175,7 @@ export default function PaymentModal({ customer, emis, breakdown, onClose, onSub
                   <input type="checkbox" checked={collectCharge} onChange={e => setCollectCharge(e.target.checked)} className="w-5 h-5 accent-amber-500 rounded" />
                   <div><p className="text-sm font-semibold text-warning">First EMI Charge</p><p className="text-xs text-ink-muted">One-time amount</p></div>
                 </div>
-                <span className="num font-semibold text-warning">{fmt(scheduledCharge)}</span>
+                <span className="num font-semibold text-warning">{formatCurrency(scheduledCharge)}</span>
               </label>
             )}
           </div>
@@ -191,14 +191,14 @@ export default function PaymentModal({ customer, emis, breakdown, onClose, onSub
           {/* EMI Selector */}
           {collectEmi && (<div><label className="label">Select EMI *</label>
             {unpaidEmis.length === 0 ? <p className="text-success font-semibold text-sm py-3 text-center">✓ All EMIs paid</p> : (
-              <div className="space-y-2 max-h-48 overflow-y-auto">{unpaidEmis.map(emi => {
+            <div className="space-y-2 max-h-48 overflow-y-auto">{unpaidEmis.map(emi => {
                 const sel = selectedEmiNo === emi.emi_no; const isOverdue = new Date(emi.due_date) < new Date();
-                return (<button key={emi.id} type="button" onClick={() => setSelectedEmiNo(emi.emi_no)} className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl border-2 text-left transition-all ${sel ? 'border-brand-400 bg-brand-50' : 'border-surface-4'}`}>
+                return (<button key={emi.id} type="button" onClick={() => setSelectedEmiNo(emi.emi_no)} className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl border text-left transition-all ${sel ? 'border-brand-300 bg-brand-50/70' : 'border-surface-4 bg-white'}`}>
                   <div className="flex items-center gap-2">
                     <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${sel ? 'bg-brand-500 border-brand-500' : 'border-surface-4'}`}>{sel && <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="4"><path d="M20 6L9 17l-5-5"/></svg>}</div>
                     <span className={`text-sm font-semibold ${sel ? 'text-brand-700' : 'text-ink'}`}>EMI #{emi.emi_no}</span>
                   </div>
-                  <div className="text-right"><span className="num text-sm font-semibold">{fmt(emi.amount)}</span><br/><span className={`text-[10px] ${isOverdue ? 'text-danger' : 'text-ink-muted'}`}>{format(new Date(emi.due_date), 'd MMM')}{isOverdue && ' ⚠'}</span></div>
+                  <div className="text-right"><span className="num text-sm font-semibold">{formatCurrency(emi.amount)}</span><br/><span className={`text-[10px] ${isOverdue ? 'text-danger' : 'text-ink-muted'}`}>{format(new Date(emi.due_date), 'd MMM')}{isOverdue && ' ⚠'}</span></div>
                 </button>);
               })}</div>
             )}
@@ -224,7 +224,7 @@ export default function PaymentModal({ customer, emis, breakdown, onClose, onSub
 
           {/* Editable amounts */}
           <div className="card bg-surface-2 p-3 space-y-2">
-            <p className="text-xs font-bold text-ink-muted uppercase tracking-widest">Amounts <span className="font-normal text-brand-500">(editable)</span></p>
+            <p className="text-sm font-semibold text-ink-muted">Amounts <span className="font-normal text-brand-500">(editable)</span></p>
             {collectEmi && <div className="flex items-center gap-2"><label className="text-xs text-ink-muted w-20">EMI</label><input type="number" min={0} value={editEmi} onChange={e => setEditEmi(e.target.value)} placeholder={String(scheduledEmiAmount)} className="input flex-1 py-2" inputMode="numeric" /></div>}
             {collectFine && scheduledFine > 0 && <div className="flex items-center gap-2"><label className="text-xs text-danger w-20">Fine</label><input type="number" min={0} value={editFine} onChange={e => setEditFine(e.target.value)} placeholder={String(scheduledFine)} className="input flex-1 py-2" inputMode="numeric" /></div>}
             {collectCharge && scheduledCharge > 0 && <div className="flex items-center gap-2"><label className="text-xs text-warning w-20">Charge</label><input type="number" min={0} value={editCharge} onChange={e => setEditCharge(e.target.value)} placeholder={String(scheduledCharge)} className="input flex-1 py-2" inputMode="numeric" /></div>}

@@ -18,7 +18,7 @@ export default function LoginPage() {
 
   const toEmail = (u: string, t: Tab) =>
     t === 'admin'
-      ? ({ TELEPOINT: 'telepoint@admin.local', telepoint: 'telepoint@admin.local' }[u] ?? `${u}@admin.local`)
+      ? `${u.toLowerCase()}@admin.local`
       : `${u.toLowerCase()}@tele.local`;
 
   async function handleLogin(e: React.FormEvent) {
@@ -45,8 +45,8 @@ export default function LoginPage() {
               <circle cx="16" cy="14" r="4" fill="white" />
             </svg>
           </div>
-          <h1 className="text-3xl font-display font-bold text-ink">TelePoint</h1>
-          <p className="text-ink-muted text-sm mt-1">EMI Management Portal</p>
+          <h1 className="text-3xl font-display font-bold text-ink">EMI Management Portal</h1>
+          <p className="text-ink-muted text-sm mt-1">Secure access for authorized users</p>
         </div>
 
         <div className="card p-8">
@@ -60,7 +60,7 @@ export default function LoginPage() {
                   tab === t ? 'bg-white text-brand-700 shadow-sm' : 'text-ink-muted hover:text-ink'
                 }`}
               >
-                {t === 'admin' ? '🔐 Admin' : '🏪 Retailer'}
+                {t === 'admin' ? 'Admin' : 'Retailer'}
               </button>
             ))}
           </div>
@@ -69,7 +69,7 @@ export default function LoginPage() {
             <div>
               <label className="label">Username</label>
               <input value={username} onChange={e => setUsername(e.target.value)}
-                className="input" placeholder={tab === 'admin' ? 'TELEPOINT' : 'your username'}
+                className="input" placeholder={tab === 'admin' ? 'Enter username' : 'Enter username'}
                 autoFocus autoComplete="username" />
             </div>
             <div>
@@ -77,7 +77,7 @@ export default function LoginPage() {
               <input type="password" value={password} onChange={e => setPassword(e.target.value)}
                 className="input" placeholder="••••••••" autoComplete="current-password" />
             </div>
-            <button type="submit" disabled={loading || !username || !password} className="btn-primary w-full py-3 mt-2">
+            <button type="submit" disabled={loading || !username || !password} className="btn-primary w-full py-3 mt-2 min-h-12">
               {loading ? 'Signing in...' : 'Sign In'}
             </button>
           </form>

@@ -15,10 +15,8 @@ import Link from 'next/link';
 import { calculateTotalFineFromEmis } from '@/lib/fineCalc';
 import BottomNav from '@/components/BottomNav';
 import RetailerBottomNotice from '@/components/RetailerBottomNotice';
+import { formatCurrency, formatDateOnly, formatDateTime } from '@/lib/formatters';
 
-function fmt(n: number) {
-  return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', minimumFractionDigits: 0 }).format(n);
-}
 
 export default function RetailerDashboard() {
   const supabase = createClient();
@@ -270,7 +268,7 @@ export default function RetailerDashboard() {
                           <p className="text-xs font-num font-semibold text-warning">{format(new Date(e.due_date), 'd MMM yyyy')}</p>
                           <p className="text-xs text-ink-muted">{daysLeft === 0 ? 'Today' : `${daysLeft}d left`}</p>
                         </td>
-                        <td><span className="font-num text-brand-600">{fmt(e.amount)}</span></td>
+                        <td><span className="font-num text-brand-600">{formatCurrency(e.amount)}</span></td>
                         <td><span className="font-num text-ink-muted">{e.mobile}</span></td>
                       </tr>
                     );
@@ -317,7 +315,7 @@ export default function RetailerDashboard() {
                               <p className="text-ink font-medium">{cust?.customer_name}</p>
                               <p className="text-xs text-ink-muted font-num">{cust?.imei}</p>
                             </td>
-                            <td><span className="font-num font-semibold">{fmt(r.total_amount)}</span></td>
+                            <td><span className="font-num font-semibold">{formatCurrency(r.total_amount)}</span></td>
                             <td><span className={`text-xs font-semibold ${r.mode === 'UPI' ? 'text-info' : 'text-success'}`}>{r.mode}</span>{r.utr && <p className="text-[11px] text-ink-muted font-num">UTR: {r.utr}</p>}</td>
                             <td>
                               {r.status === 'PENDING' && <span className="badge-pending">Pending</span>}
@@ -351,7 +349,7 @@ export default function RetailerDashboard() {
         {searchResults !== null && searchResults.length > 1 && !selectedCustomer && (
           <div className="card overflow-hidden animate-fade-in">
             <div className="px-5 py-3 border-b border-white/[0.05]">
-              <span className="text-xs text-ink-muted uppercase tracking-widest">{searchResults.length} customers found</span>
+              <span className="text-xs text-ink-muted">{searchResults.length} customers found</span>
             </div>
             <table className="data-table text-xs sm:text-sm">
               <thead>
@@ -369,7 +367,7 @@ export default function RetailerDashboard() {
                     <td>
                       {c.status === 'RUNNING' ? <span className="badge-running">Running</span> : <span className="badge-complete">Complete</span>}
                     </td>
-                    <td><span className="font-num text-brand-600">{fmt(c.emi_amount)}</span></td>
+                    <td><span className="font-num text-brand-600">{formatCurrency(c.emi_amount)}</span></td>
                     <td>
                       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-ink-muted">
                         <path d="M9 18l6-6-6-6" />
@@ -404,13 +402,13 @@ export default function RetailerDashboard() {
                   {breakdown.fine_due > 0 && (
                     <div className="alert-red border-2">
                       <p className="font-bold text-base text-crimson-400">⚠️ Fine Pending</p>
-                      <p className="text-sm font-semibold text-ink-muted mt-0.5">Pending fine: {fmt(breakdown.fine_due)}</p>
+                      <p className="text-sm font-semibold text-ink-muted mt-0.5">Pending fine: {formatCurrency(breakdown.fine_due)}</p>
                     </div>
                   )}
                   {(breakdown.first_emi_charge_due ?? 0) > 0 && (
                     <div className="alert-gold border-2">
-                      <p className="font-bold text-base text-gold-400">⚠️ 1ST EMI CHARGE Pending</p>
-                      <p className="text-sm font-semibold text-ink-muted mt-0.5">Pending amount: {fmt(breakdown.first_emi_charge_due || 0)}</p>
+                      <p className="font-bold text-base text-gold-400">⚠️ First EMI charge pending</p>
+                      <p className="text-sm font-semibold text-ink-muted mt-0.5">Pending amount: {formatCurrency(breakdown.first_emi_charge_due || 0)}</p>
                     </div>
                   )}
                   {daysLeft !== null && daysLeft >= 0 && daysLeft <= 5 && (
