@@ -151,12 +151,12 @@ export default function PaymentModal({ customer, emis, breakdown, onClose, onSub
             <p className="text-xs text-ink-muted mt-1">Mobile: {customer.mobile} · IMEI: {customer.imei}</p>
           </div>
           {/* WHAT TO COLLECT — checkboxes */}
-          <div className="card bg-surface-2 p-3.5 space-y-2.5">
-            <p className="text-sm font-semibold text-ink-muted">Select what to collect</p>
+          <div className="card bg-surface-2 p-4 space-y-3">
+            <p className="text-xs font-bold text-ink-muted uppercase tracking-widest">EMI and Fine Details</p>
             <label className={`flex items-center justify-between p-3 rounded-xl border-2 cursor-pointer transition-all ${collectEmi ? 'border-brand-400 bg-brand-50' : 'border-surface-4'}`}>
               <div className="flex items-center gap-3">
                 <input type="checkbox" checked={collectEmi} onChange={e => setCollectEmi(e.target.checked)} className="w-5 h-5 accent-brand-500 rounded" />
-                  <div><p className="text-sm font-semibold text-ink">EMI #{selectedEmiNo || '—'}</p><p className="text-xs text-ink-muted">EMI Amount: {formatCurrency(scheduledEmiAmount)}</p></div>
+                  <div><p className="text-sm font-semibold text-ink">EMI #{selectedEmiNo || '—'}</p><p className="text-xs text-ink-muted">EMI Amount: {fmt(scheduledEmiAmount)}</p></div>
               </div>
               <span className="num font-semibold text-ink">{formatCurrency(scheduledEmiAmount)}</span>
             </label>
@@ -233,7 +233,7 @@ export default function PaymentModal({ customer, emis, breakdown, onClose, onSub
           {/* Total */}
           <div className="flex items-center justify-between px-4 py-3 rounded-xl bg-brand-50 border border-brand-200">
             <span className="font-bold text-ink">Total Payable</span>
-            <span className="num text-2xl font-bold text-brand-600">{formatCurrency(total)}</span>
+            <span className="num text-2xl font-bold text-brand-600">{fmt(total)}</span>
           </div>
 
         </div>
