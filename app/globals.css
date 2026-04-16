@@ -8,7 +8,7 @@
 html { scroll-behavior: smooth; -webkit-text-size-adjust: 100%; overflow-x: hidden; }
 body {
   background: #f8fafc; color: #1e293b;
-  font-family: 'DM Sans', system-ui, sans-serif; line-height: 1.5;
+  font-family: 'Noto Sans Bengali', 'Noto Sans Devanagari', 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; line-height: 1.5; word-break: break-word; overflow-wrap: anywhere;
   overflow-x: hidden; /* Prevent horizontal scroll on mobile */
   -webkit-tap-highlight-color: transparent;
 }
@@ -48,7 +48,7 @@ body {
     min-height: 44px; /* Touch-friendly */
     font-size: 16px; /* Prevents iOS zoom on focus */
   }
-  .label { @apply block text-xs font-semibold text-ink-muted uppercase tracking-wide mb-1.5; }
+  .label { @apply block text-sm font-semibold text-ink-muted mb-1.5; }
 
   /* Badges */
   .badge { @apply inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold; }
@@ -142,29 +142,6 @@ body {
     border-radius: 0 !important;
     max-height: 100dvh !important;
     height: 100dvh;
-  }
-
-  .data-table,
-  .tbl,
-  .data-table tbody,
-  .tbl tbody,
-  .data-table tr,
-  .tbl tr,
-  .data-table td,
-  .tbl td {
-    display: block;
-    width: 100%;
-  }
-
-  .data-table thead,
-  .tbl thead {
-    display: none;
-  }
-
-  .data-table tr,
-  .tbl tr {
-    border-bottom: 1px solid #e2e8f0;
-    padding: 0.5rem 0.25rem;
   }
 }
 
