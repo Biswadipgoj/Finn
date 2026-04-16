@@ -1,25 +1,91 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient, createServiceClient } from '@/lib/supabase/server';
+import { createServiceClient } from '@/lib/supabase/server';
+import { requireAdmin } from '@/lib/auth';
+
+type ReportRow = {
+  customer_id: string;
+  name: string;
+  imei: string;
+  phone_model: string;
+  retailer: string;
+  fine_due: number;
+  first_emi_charge_due: number;
+  total_due: number;
+  first_due_date: string | null;
+};
+
 export async function GET(req: NextRequest) {
-  const supabase = createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  const svc = createServiceClient();
-  const { data: emis } = await svc.from('emi_schedule').select('emi_no, due_date, amount, fine_amount, fine_paid_amount, fine_waived, customer:customers(customer_name, imei, mobile, retailer:retailers(name))').gt('fine_amount', 0).eq('fine_waived', false).order('due_date');
-  const rows: string[][] = [['Retailer','Customer','IMEI','Mobile','EMI #','Due Date','EMI Amount','Fine Amount','Fine Paid','Fine Remaining','Days Overdue']];
-  for (const e of emis || []) {
-    const c = e.customer as Record<string, unknown> | null;
-    const remaining = (Number(e.fine_amount)||0) - (Number(e.fine_paid_amount)||0);
-    if (remaining <= 0) continue;
-    const days = Math.max(0, Math.floor((Date.now() - new Date(e.due_date).getTime()) / 86400000));
-    rows.push([
-      ((c?.retailer as {name?:string})?.name) || '',
-      (c?.customer_name as string) || '', "'" + ((c?.imei as string) || ''),
-      (c?.mobile as string) || '', String(e.emi_no), e.due_date,
-      String(e.amount), String(e.fine_amount), String(e.fine_paid_amount || 0),
-      String(remaining), String(days)
-    ]);
+  const admin = await requireAdmin();
+  if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
+  const supabase = createServiceClient();
+  const byCustomer = new Map<string, ReportRow>();
+
+  function upsertCustomer(customer: any, patch: Partial<ReportRow>) {
+    if (!customer?.id || !customer?.imei) return;
+    const key = customer.imei || customer.id;
+    const current = byCustomer.get(key) || {
+      customer_id: customer.id,
+      name: customer.customer_name || '',
+      imei: customer.imei || '',
+      phone_model: customer.model_no || '',
+      retailer: customer.retailer?.name || '',
+      fine_due: 0,
+      first_emi_charge_due: 0,
+      total_due: 0,
+      first_due_date: null,
+    };
+
+    const next = { ...current, ...patch };
+    next.total_due = next.fine_due + next.first_emi_charge_due;
+    byCustomer.set(key, next);
   }
-  const csv = rows.map(r => r.join(',')).join('\r\n');
-  return new NextResponse(csv, { headers: { 'Content-Type': 'text/csv', 'Content-Disposition': 'attachment; filename="Fine_Due_Report.csv"' } });
+
+  const { data: fineRows, error: fineErr } = await supabase
+    .from('emi_schedule')
+    .select(`
+      customer_id,
+      fine_amount,
+      fine_paid_amount,
+      due_date,
+      customer:customers(id, customer_name, imei, model_no, retailer:retailers(name))
+    `)
+    .eq('fine_waived', false)
+    .gt('fine_amount', 0)
+    .order('due_date', { ascending: true });
+
+  if (fineErr) return NextResponse.json({ error: fineErr.message }, { status: 400 });
+
+  for (const row of fineRows || []) {
+    const customer: any = (row as any).customer;
+    const fineDue = Math.max(0, Number((row as any).fine_amount || 0) - Number((row as any).fine_paid_amount || 0));
+    if (fineDue <= 0) continue;
+    const key = customer?.imei || customer?.id;
+    const current = key ? byCustomer.get(key) : null;
+    upsertCustomer(customer, {
+      fine_due: (current?.fine_due || 0) + fineDue,
+      first_due_date: current?.first_due_date && current.first_due_date < (row as any).due_date
+        ? current.first_due_date
+        : (row as any).due_date,
+    });
+  }
+
+  const { data: firstChargeRows, error: chargeErr } = await supabase
+    .from('customers')
+    .select('id, customer_name, imei, model_no, first_emi_charge_amount, retailer:retailers(name)')
+    .gt('first_emi_charge_amount', 0)
+    .is('first_emi_charge_paid_at', null)
+    .eq('status', 'RUNNING');
+
+  if (chargeErr) return NextResponse.json({ error: chargeErr.message }, { status: 400 });
+
+  for (const customer of firstChargeRows || []) {
+    const key = (customer as any).imei || (customer as any).id;
+    const current = byCustomer.get(key);
+    upsertCustomer(customer, {
+      first_emi_charge_due: (current?.first_emi_charge_due || 0) + Number((customer as any).first_emi_charge_amount || 0),
+    });
+  }
+
+  return NextResponse.json({ data: Array.from(byCustomer.values()).filter(r => r.total_due > 0) });
 }

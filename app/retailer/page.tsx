@@ -298,13 +298,13 @@ export default function RetailerDashboard() {
                       {myRequests.map(r => {
                         const cust = r.customer as { customer_name?: string; imei?: string };
                         return (
-                          <tr key={r.id}>
+                          <tr key={r.id} className="cursor-pointer hover:bg-surface-2" onClick={() => window.open(`/receipt/${r.id}`, '_blank')}>
                             <td>
                               <p className="text-ink font-medium">{cust?.customer_name}</p>
                               <p className="text-xs text-ink-muted font-num">{cust?.imei}</p>
                             </td>
                             <td><span className="font-num font-semibold">{fmt(r.total_amount)}</span></td>
-                            <td><span className={`text-xs font-semibold ${r.mode === 'UPI' ? 'text-info' : 'text-success'}`}>{r.mode}</span></td>
+                            <td><span className={`text-xs font-semibold ${r.mode === 'UPI' ? 'text-info' : 'text-success'}`}>{r.mode}</span>{r.utr && <p className="text-[11px] text-ink-muted font-num">UTR: {r.utr}</p>}</td>
                             <td>
                               {r.status === 'PENDING' && <span className="badge-pending">Pending</span>}
                               {r.status === 'APPROVED' && <span className="badge-approved">Approved</span>}
@@ -312,7 +312,7 @@ export default function RetailerDashboard() {
                             </td>
                             <td className="text-xs text-ink-muted">{format(new Date(r.created_at), 'd MMM, h:mm a')}</td>
                             <td>
-                              <Link href={`/receipt/${r.id}`} target="_blank" className="text-xs text-info hover:text-info">
+                              <Link onClick={e => e.stopPropagation()} href={`/receipt/${r.id}`} target="_blank" className="text-xs text-info hover:text-info">
                                 Receipt →
                               </Link>
                             </td>

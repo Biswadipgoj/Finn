@@ -68,7 +68,7 @@ export async function POST(req: NextRequest) {
   const { data: request, error: fetchErr } = await svc
     .from('payment_requests')
     .select(`
-      id, customer_id, retailer_id, submitted_by, status, mode,
+      id, customer_id, retailer_id, submitted_by, status, mode, utr,
       total_emi_amount, fine_amount, first_emi_charge_amount, total_amount,
       notes, selected_emi_nos,
       payment_request_items ( id, emi_schedule_id, emi_no, amount )
@@ -119,7 +119,11 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  if (emiIds.length === 0) {
+  const isNoEmiRequest = emiIds.length === 0
+    && Number(request.total_emi_amount || 0) === 0
+    && (Number(request.fine_amount || 0) > 0 || Number(request.first_emi_charge_amount || 0) > 0);
+
+  if (emiIds.length === 0 && !isNoEmiRequest) {
     console.error('Cannot resolve EMI IDs for request', request_id);
     return NextResponse.json(
       { error: 'No EMI items linked to this request — cannot approve' },
@@ -132,6 +136,80 @@ export async function POST(req: NextRequest) {
     ? items.map(i => i.emi_no)
     : (request.selected_emi_nos ?? []);
   const lowestEmiNo = allEmiNos.length > 0 ? Math.min(...allEmiNos) : null;
+
+  if (isNoEmiRequest) {
+    let remainingFine = Number(request.fine_amount || 0);
+    if (remainingFine > 0) {
+      const { data: fineRows } = await svc
+        .from('emi_schedule')
+        .select('id, emi_no, fine_amount, fine_paid_amount')
+        .eq('customer_id', request.customer_id)
+        .eq('fine_waived', false)
+        .gt('fine_amount', 0)
+        .order('due_date', { ascending: true });
+
+      for (const row of fineRows || []) {
+        if (remainingFine <= 0) break;
+        const paidSoFar = Number(row.fine_paid_amount || 0);
+        const dueFine = Math.max(0, Number(row.fine_amount || 0) - paidSoFar);
+        if (dueFine <= 0) continue;
+        const applyFine = Math.min(dueFine, remainingFine);
+        const newPaid = paidSoFar + applyFine;
+        await svc
+          .from('emi_schedule')
+          .update({
+            fine_paid_amount: newPaid,
+            fine_paid_at: now
+          })
+          .eq('id', row.id);
+
+        await svc.from('fine_history').insert({
+          customer_id: request.customer_id,
+          emi_schedule_id: row.id,
+          emi_no: row.emi_no,
+          fine_type: 'PAID',
+          fine_amount: applyFine,
+          cumulative_fine: newPaid,
+          fine_date: now.split('T')[0],
+          reason: 'Approved retailer fine via ' + request.mode,
+        }).catch(() => {});
+        remainingFine -= applyFine;
+      }
+    }
+
+    if (Number(request.first_emi_charge_amount || 0) > 0) {
+      await svc
+        .from('customers')
+        .update({ first_emi_charge_paid_at: now })
+        .eq('id', request.customer_id)
+        .is('first_emi_charge_paid_at', null);
+    }
+
+    await svc
+      .from('payment_requests')
+      .update({
+        status: 'APPROVED',
+        approved_by: user.id,
+        approved_at: now,
+        notes: remark
+          ? ((request.notes ? (request.notes as string) + '\n' : '') + 'Admin remark: ' + remark)
+          : (request.notes as string ?? null),
+      })
+      .eq('id', request_id);
+
+    await svc.from('audit_log').insert({
+      actor_user_id: user.id,
+      actor_role: 'super_admin',
+      action: 'APPROVE_FINE_OR_CHARGE_PAYMENT',
+      table_name: 'payment_requests',
+      record_id: request_id,
+      before_data: { status: 'PENDING' },
+      after_data: { status: 'APPROVED', fine_amount: request.fine_amount, first_emi_charge_amount: request.first_emi_charge_amount },
+      remark: remark ?? null,
+    });
+
+    return NextResponse.json({ success: true, request_id, approved_at: now });
+  }
 
   // STEP A: Mark EMIs APPROVED
   const { error: emiErr } = await svc

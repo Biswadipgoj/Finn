@@ -13,11 +13,11 @@ export async function POST(req: NextRequest) {
       .from('customers')
       .select(`
         id, retailer_id, customer_name, father_name, aadhaar, mobile,
-        alternate_number_1, alternate_number_2,
+        alternate_number_1, alternate_number_2, reference_name, reference_mobile,
         model_no, imei, purchase_value, down_payment, disburse_amount,
         purchase_date, emi_due_day, emi_amount, emi_tenure,
         first_emi_charge_amount, first_emi_charge_paid_at,
-        customer_photo_url, status,
+        customer_photo_url, status, is_locked, lock_provider,
         retailer:retailers(name, mobile)
       `)
       .eq('id', customer_id)
@@ -29,7 +29,7 @@ export async function POST(req: NextRequest) {
 
     const { data: emis } = await serviceClient
       .from('emi_schedule')
-      .select('id, emi_no, due_date, amount, status, paid_at, mode, fine_amount, fine_waived')
+      .select('id, emi_no, due_date, amount, status, paid_at, mode, utr, fine_amount, fine_waived, fine_paid_amount, fine_paid_at')
       .eq('customer_id', customer.id)
       .order('emi_no');
 
@@ -65,11 +65,11 @@ export async function POST(req: NextRequest) {
     .from('customers')
     .select(`
       id, retailer_id, customer_name, father_name, aadhaar, mobile,
-      alternate_number_1, alternate_number_2,
+      alternate_number_1, alternate_number_2, reference_name, reference_mobile,
       model_no, imei, purchase_value, down_payment, disburse_amount,
       purchase_date, emi_due_day, emi_amount, emi_tenure,
       first_emi_charge_amount, first_emi_charge_paid_at,
-      customer_photo_url, status,
+      customer_photo_url, status, is_locked, lock_provider,
       retailer:retailers(name, mobile)
     `);
 
@@ -117,7 +117,7 @@ export async function POST(req: NextRequest) {
 
   const { data: emis } = await serviceClient
     .from('emi_schedule')
-    .select('id, emi_no, due_date, amount, status, paid_at, mode, fine_amount, fine_waived')
+    .select('id, emi_no, due_date, amount, status, paid_at, mode, utr, fine_amount, fine_waived, fine_paid_amount, fine_paid_at')
     .eq('customer_id', customer.id)
     .order('emi_no');
 

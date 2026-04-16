@@ -37,10 +37,45 @@ export async function POST(req: NextRequest) {
   }
 
   if (fine_amount > 0) {
-    let fid: string | null = null, fno: number | null = null;
-    if (emis.length) { const ln = Math.min(...emis.map((e: { emi_no: number }) => e.emi_no)); fno = ln; fid = (emis.find((e: { emi_no: number }) => e.emi_no === ln) as { id: string })?.id; await svc.from('emi_schedule').update({ fine_paid_amount: fine_amount, fine_paid_at: now }).eq('customer_id', customer_id).eq('emi_no', ln); }
-    else { const { data: oe } = await svc.from('emi_schedule').select('id,emi_no').eq('customer_id', customer_id).eq('status', 'UNPAID').lt('due_date', now.split('T')[0]).order('emi_no').limit(1).single(); if (oe) { fid = oe.id; fno = oe.emi_no; await svc.from('emi_schedule').update({ fine_paid_amount: fine_amount, fine_paid_at: now }).eq('id', oe.id); } }
-    if (fid) await svc.from('fine_history').insert({ customer_id, emi_schedule_id: fid, emi_no: fno, fine_type: 'PAID', fine_amount, cumulative_fine: fine_amount, fine_date: now.split('T')[0], reason: 'Admin direct fine ' + fine_amount + ' via ' + mode }).catch(() => {});
+    let remainingFine = Number(fine_amount || 0);
+    const fineSplits: { id: string; emi_no: number; apply: number; newPaid: number; fullFine: boolean; }[] = [];
+
+    if (emis.length) {
+      const ln = Math.min(...emis.map((e: { emi_no: number }) => e.emi_no));
+      const emi = emis.find((e: { emi_no: number }) => e.emi_no === ln) as { id: string; emi_no: number; fine_amount?: number; fine_paid_amount?: number } | undefined;
+      if (emi) {
+        const paidSoFar = Number(emi.fine_paid_amount || 0);
+        const dueFine = Math.max(remainingFine, Number(emi.fine_amount || 0) - paidSoFar);
+        const apply = Math.min(dueFine, remainingFine);
+        fineSplits.push({ id: emi.id, emi_no: emi.emi_no, apply, newPaid: paidSoFar + apply, fullFine: paidSoFar + apply >= Number(emi.fine_amount || 0) });
+        remainingFine -= apply;
+      }
+    }
+
+    if (remainingFine > 0 || fineSplits.length === 0) {
+      const { data: fineRows } = await svc
+        .from('emi_schedule')
+        .select('id,emi_no,fine_amount,fine_paid_amount')
+        .eq('customer_id', customer_id)
+        .eq('fine_waived', false)
+        .gt('fine_amount', 0)
+        .order('due_date');
+
+      for (const row of fineRows || []) {
+        if (remainingFine <= 0) break;
+        const paidSoFar = Number(row.fine_paid_amount || 0);
+        const dueFine = Math.max(0, Number(row.fine_amount || 0) - paidSoFar);
+        if (dueFine <= 0) continue;
+        const apply = Math.min(dueFine, remainingFine);
+        fineSplits.push({ id: row.id, emi_no: row.emi_no, apply, newPaid: paidSoFar + apply, fullFine: paidSoFar + apply >= Number(row.fine_amount || 0) });
+        remainingFine -= apply;
+      }
+    }
+
+    for (const split of fineSplits) {
+      await svc.from('emi_schedule').update({ fine_paid_amount: split.newPaid, fine_paid_at: now }).eq('id', split.id);
+      await svc.from('fine_history').insert({ customer_id, emi_schedule_id: split.id, emi_no: split.emi_no, fine_type: 'PAID', fine_amount: split.apply, cumulative_fine: split.newPaid, fine_date: now.split('T')[0], reason: 'Admin direct fine ' + split.apply + ' via ' + mode }).catch(() => {});
+    }
   }
 
   if (first_emi_charge_amount > 0) await svc.from('customers').update({ first_emi_charge_paid_at: now }).eq('id', customer_id);

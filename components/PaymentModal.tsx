@@ -31,7 +31,7 @@ export default function PaymentModal({ customer, emis, breakdown, onClose, onSub
   const scheduledFine = Math.max(breakdown?.fine_due ?? 0, autoFine);
   const scheduledCharge = breakdown?.first_emi_charge_due ?? (customer.first_emi_charge_paid_at ? 0 : (customer.first_emi_charge_amount || 0));
 
-  const [collectEmi, setCollectEmi] = useState(true);
+  const [collectEmi, setCollectEmi] = useState(unpaidEmis.length > 0);
   const [collectFine, setCollectFine] = useState(scheduledFine > 0);
   const [collectCharge, setCollectCharge] = useState(scheduledCharge > 0);
 
@@ -224,7 +224,7 @@ export default function PaymentModal({ customer, emis, breakdown, onClose, onSub
         </div>
         <div className="sticky bottom-0 z-20 bg-white border-t border-surface-4 p-3 flex gap-3">
           <button onClick={onClose} className="btn-secondary flex-1 py-3">Cancel</button>
-          <button onClick={handleSubmit} disabled={loading} className="btn-primary flex-1 py-3">{loading ? '...' : isAdmin ? '✓ Record' : '→ Submit'}</button>
+          <button onClick={handleSubmit} disabled={cannotSubmit} className="btn-primary flex-1 py-3 disabled:opacity-50">{loading ? '...' : isAdmin ? '✓ Record' : '→ Submit'}</button>
         </div>
       </div>
     </div>

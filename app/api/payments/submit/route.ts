@@ -38,12 +38,5 @@ export async function POST(req: NextRequest) {
     await svc.from('emi_schedule').update({ status: 'PENDING_APPROVAL' }).in('id', emi_ids);
   }
 
-  if (noEmi && fine_amount > 0) {
-    const { data: oe } = await svc.from('emi_schedule').select('id, emi_no').eq('customer_id', customer_id).eq('status', 'UNPAID').lt('due_date', new Date().toISOString().split('T')[0]).order('emi_no').limit(1).single();
-    if (oe) {
-      await svc.from('emi_schedule').update({ fine_paid_amount: fine_amount, fine_paid_at: new Date().toISOString() }).eq('id', oe.id);
-      await svc.from('fine_history').insert({ customer_id, emi_schedule_id: oe.id, emi_no: oe.emi_no, fine_type: 'PAID', fine_amount, cumulative_fine: fine_amount, fine_date: new Date().toISOString().split('T')[0], reason: 'Retailer collected fine via ' + mode }).catch(() => {});
-    }
-  }
   return NextResponse.json({ success: true, request_id: request.id });
 }

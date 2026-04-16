@@ -40,11 +40,21 @@ export async function POST(req: NextRequest) {
   const items: Array<{ emi_schedule_id: string }> = request.payment_request_items || [];
   const emiIds = items.map(i => i.emi_schedule_id).filter(Boolean);
 
-  // Revert EMIs to UNPAID
+  // Revert EMIs to UNPAID and clear every payment marker.
+  // Without clearing paid_at/mode/UTR, rejected/deleted-style payments
+  // still showed as payment dates in customer and EMI summaries.
   if (emiIds.length > 0) {
     const { error: emiErr } = await serviceClient
       .from('emi_schedule')
-      .update({ status: 'UNPAID' })
+      .update({
+        status: 'UNPAID',
+        paid_at: null,
+        mode: null,
+        utr: null,
+        approved_by: null,
+        collected_by_role: null,
+        collected_by_user_id: null,
+      })
       .in('id', emiIds);
 
     if (emiErr) {
@@ -53,9 +63,12 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  // Update request
+  // Update request and clear approved_at so rejected payments never appear
+  // in approved-payment date reports or summaries.
   await serviceClient.from('payment_requests').update({
     status: 'REJECTED',
+    approved_at: null,
+    approved_by: null,
     rejected_by: user.id,
     rejected_at: new Date().toISOString(),
     rejection_reason: reason,

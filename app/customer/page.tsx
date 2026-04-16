@@ -196,12 +196,15 @@ export default function CustomerPortal() {
     : null;
 
   const dueSummary = useMemo(() => {
-    const af = calculateTotalFineFromEmis(sortedEmis);
-    const baseFine = Math.max(450, breakdown?.fine_due ?? 0, af > 0 ? 450 : 0);
-    const weeklyFine = Math.max(0, af - 450);
-    const emiDue = breakdown?.selected_emi_amount || breakdown?.next_emi_amount || 0;
-    const totalDue = emiDue + baseFine + weeklyFine;
-    return { emiDue, baseFine, weeklyFine, totalDue, nextDueDate: breakdown?.next_emi_due_date };
+    const autoFine = calculateTotalFineFromEmis(sortedEmis);
+    const dbFineDue = Math.max(0, breakdown?.fine_due ?? 0);
+    const fineDue = Math.max(dbFineDue, autoFine);
+    const baseFine = fineDue > 0 ? Math.min(450, fineDue) : 0;
+    const weeklyFine = fineDue > 450 ? fineDue - 450 : 0;
+    const emiDue = Math.max(0, breakdown?.selected_emi_amount || breakdown?.next_emi_amount || 0);
+    const firstChargeDue = Math.max(0, breakdown?.first_emi_charge_due ?? 0);
+    const totalDue = emiDue + fineDue + firstChargeDue;
+    return { emiDue, baseFine, weeklyFine, firstChargeDue, fineDue, totalDue, nextDueDate: breakdown?.next_emi_due_date };
   }, [sortedEmis, breakdown]);
 
   async function buildReceiptFile(totalAmount: number) {
@@ -473,7 +476,7 @@ export default function CustomerPortal() {
 
         {/* Phase 6: Smart Alert Popup */}
         <SmartAlertPopup
-          fineDue={calculateTotalFineFromEmis(sortedEmis)}
+          fineDue={dueSummary.fineDue}
           daysUntilDue={daysUntilDue}
           nextEmiNo={nextUnpaidEmi?.emi_no}
           nextEmiAmount={nextUnpaidEmi?.amount}
@@ -644,10 +647,10 @@ export default function CustomerPortal() {
                 {fb.sort((a, b) => a.emi_no - b.emi_no).map(r => (
                   <div key={r.emi_no} className="px-5 py-3 space-y-1">
                     <div className="flex justify-between"><span className="text-sm font-medium text-ink">EMI #{r.emi_no}</span><span className="text-xs text-crimson-400 font-semibold">{r.days}d overdue</span></div>
-                    <div className="flex justify-between text-xs text-slate-500"><span>Base ₹450</span><span className="font-num">{fmt(r.baseFine)}</span></div>
+                    <div className="flex justify-between text-xs text-slate-500"><span>Base ₹450</span><span className="font-num">{fmt(r.baseFineTotal)}</span></div>
                     {r.weeklyFine > 0 && <div className="flex justify-between text-xs text-slate-500"><span>+₹25/wk</span><span className="font-num">{fmt(r.weeklyFine)}</span></div>}
                     <div className="flex justify-between text-sm font-semibold"><span className="text-crimson-400">Total</span><span className="font-num text-crimson-400">{fmt(r.totalFine)}</span></div>
-                    {r.paid > 0 && <div className="flex justify-between text-xs"><span className="text-jade-400">Paid{(() => { const e = sortedEmis.find(x => x.emi_no === r.emi_no); return e?.fine_paid_at ? ` (${new Date(e.fine_paid_at).toLocaleDateString('en-IN', {day:'numeric',month:'short'})})` : ''; })()}</span><span className="font-num text-jade-400">-{fmt(r.paid)}</span></div>}
+                    {r.paid > 0 && <div className="flex justify-between text-xs"><span className="text-jade-400">Paid{(() => { const e = sortedEmis.find(x => x.emi_no === r.emi_no); return e?.fine_paid_at ? ` (${new Date(e.fine_paid_at).toLocaleDateString('en-IN', {day:'numeric',month:'short',year:'2-digit'})})` : ''; })()}</span><span className="font-num text-jade-400">-{fmt(r.paid)}</span></div>}
                   </div>
                 ))}
               </div>
@@ -749,7 +752,7 @@ export default function CustomerPortal() {
                   <div key={e.id} className="px-5 py-2.5 flex justify-between items-center">
                     <div>
                       <p className="text-sm font-medium text-ink">EMI #{e.emi_no} — {fmt(e.amount)}</p>
-                      {e.fine_paid_amount > 0 && <p className="text-xs text-crimson-400">+ Fine: {fmt(e.fine_paid_amount)}{e.fine_paid_at ? ` (${format(new Date(e.fine_paid_at), 'd MMM')})` : ''}</p>}
+                      {e.fine_paid_amount > 0 && <p className="text-xs text-crimson-400">+ Fine: {fmt(e.fine_paid_amount)}{e.fine_paid_at ? ` (${format(new Date(e.fine_paid_at), 'd MMM yyyy')})` : ''}</p>}
                     </div>
                     <div className="text-right">
                       <p className="text-xs text-jade-400 font-semibold">✓ Paid</p>

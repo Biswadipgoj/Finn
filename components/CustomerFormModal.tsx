@@ -24,6 +24,8 @@ const EMPTY = {
   mobile: '',
   alternate_number_1: '',
   alternate_number_2: '',
+  reference_name: '',
+  reference_mobile: '',
   model_no: '',
   imei: '',
   box_no: '',
@@ -36,6 +38,10 @@ const EMPTY = {
   emi_amount: '',
   emi_tenure: '6',
   first_emi_charge_amount: '0',
+  first_emi_charge_paid_at: '',
+  status: 'RUNNING',
+  completion_date: '',
+  completion_remark: '',
   // Images — ALL optional
   customer_photo_url: '',
   aadhaar_front_url: '',
@@ -79,6 +85,8 @@ export default function CustomerFormModal({
         mobile: customer.mobile || '',
         alternate_number_1: customer.alternate_number_1 || '',
         alternate_number_2: customer.alternate_number_2 || '',
+        reference_name: customer.reference_name || '',
+        reference_mobile: customer.reference_mobile || '',
         model_no: customer.model_no || '',
         imei: customer.imei || '',
         box_no: customer.box_no || '',
@@ -91,6 +99,10 @@ export default function CustomerFormModal({
         emi_amount: String(customer.emi_amount || ''),
         emi_tenure: String(customer.emi_tenure || '6'),
         first_emi_charge_amount: String(customer.first_emi_charge_amount || '0'),
+        first_emi_charge_paid_at: customer.first_emi_charge_paid_at ? new Date(customer.first_emi_charge_paid_at).toISOString().slice(0, 16) : '',
+        status: customer.status || 'RUNNING',
+        completion_date: customer.completion_date || '',
+        completion_remark: customer.completion_remark || '',
         customer_photo_url: customer.customer_photo_url || '',
         aadhaar_front_url: customer.aadhaar_front_url || '',
         aadhaar_back_url: customer.aadhaar_back_url || '',
@@ -135,6 +147,9 @@ export default function CustomerFormModal({
 
     if (form.alternate_number_2 && form.alternate_number_2.replace(/\D/g, '').length !== 10)
       errs.alternate_number_2 = 'Alternate number must be 10 digits';
+
+    if (form.reference_mobile && form.reference_mobile.replace(/\D/g, '').length !== 10)
+      errs.reference_mobile = 'Reference mobile must be 10 digits';
 
     if (!form.aadhaar || form.aadhaar.replace(/\D/g, '').length !== 12)
       errs.aadhaar = 'Aadhaar must be exactly 12 digits';
@@ -187,7 +202,7 @@ export default function CustomerFormModal({
     // Figure out which tab to switch to for the first error
     const infoFields: (keyof FormData)[] = [
       'retailer_id', 'customer_name', 'father_name', 'mobile', 'alternate_number_1',
-      'alternate_number_2', 'aadhaar', 'address', 'landmark', 'model_no', 'imei', 'box_no',
+      'alternate_number_2', 'reference_mobile', 'aadhaar', 'address', 'landmark', 'model_no', 'imei', 'box_no',
     ];
     const financeFields: (keyof FormData)[] = [
       'purchase_value', 'purchase_date', 'emi_amount', 'emi_due_day',
@@ -230,6 +245,8 @@ export default function CustomerFormModal({
       mobile: form.mobile.replace(/\D/g, ''),
       alternate_number_1: form.alternate_number_1.replace(/\D/g, '') || null,
       alternate_number_2: form.alternate_number_2.replace(/\D/g, '') || null,
+      reference_name: form.reference_name.trim() || null,
+      reference_mobile: form.reference_mobile.replace(/\D/g, '') || null,
       model_no: form.model_no.trim() || null,
       imei: form.imei.replace(/\D/g, ''),
       box_no: form.box_no.trim() || null,
@@ -242,6 +259,12 @@ export default function CustomerFormModal({
       emi_amount: parseFloat(form.emi_amount),
       emi_tenure: parseInt(form.emi_tenure),
       first_emi_charge_amount: parseFloat(form.first_emi_charge_amount) || 0,
+      ...(isAdmin && customer ? {
+        first_emi_charge_paid_at: form.first_emi_charge_paid_at ? new Date(form.first_emi_charge_paid_at).toISOString() : null,
+        status: form.status as Customer['status'],
+        completion_date: form.completion_date || null,
+        completion_remark: form.completion_remark.trim() || null,
+      } : {}),
       // Images are always optional
       customer_photo_url: form.customer_photo_url.trim() || null,
       aadhaar_front_url: form.aadhaar_front_url.trim() || null,
@@ -365,6 +388,10 @@ export default function CustomerFormModal({
                     <F label="Alternate Number 1" field="alternate_number_1"
                        form={form} set={set} errors={errors} placeholder="Optional — 10 digits" maxLen={10} inputMode="numeric" />
                     <F label="Alternate Number 2" field="alternate_number_2"
+                       form={form} set={set} errors={errors} placeholder="Optional — 10 digits" maxLen={10} inputMode="numeric" />
+                    <F label="Reference Name" field="reference_name"
+                       form={form} set={set} errors={errors} placeholder="Optional" />
+                    <F label="Reference Mobile" field="reference_mobile"
                        form={form} set={set} errors={errors} placeholder="Optional — 10 digits" maxLen={10} inputMode="numeric" />
                     <F label="Aadhaar Number" field="aadhaar"
                        form={form} set={set} errors={errors} required placeholder="12 digits" maxLen={12} inputMode="numeric" />
@@ -503,6 +530,42 @@ export default function CustomerFormModal({
                     <F label="1st EMI Charge (₹)" field="first_emi_charge_amount"
                        form={form} set={set} errors={errors} type="number" placeholder="0 if none" />
                   </div>
+
+                  {isAdmin && customer && (
+                    <div className="mt-5 p-4 rounded-xl bg-warning-light border border-warning-border">
+                      <p className="text-xs font-bold uppercase tracking-widest text-warning mb-3">Super Admin Direct SQL Controls</p>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                          <label className="label">Customer Status</label>
+                          <select value={form.status} onChange={e => set('status', e.target.value)} className="input">
+                            <option value="RUNNING">RUNNING</option>
+                            <option value="COMPLETE">COMPLETE</option>
+                            <option value="SETTLED">SETTLED</option>
+                            <option value="NPA">NPA</option>
+                          </select>
+                        </div>
+                        <div>
+                          <label className="label">1st EMI Charge Paid Date & Time</label>
+                          <input
+                            type="datetime-local"
+                            value={form.first_emi_charge_paid_at}
+                            onChange={e => set('first_emi_charge_paid_at', e.target.value)}
+                            className="input"
+                          />
+                          <button type="button" onClick={() => set('first_emi_charge_paid_at', '')} className="text-xs text-danger mt-1 underline">Clear paid date</button>
+                        </div>
+                        <div>
+                          <label className="label">Completion / Settlement Date</label>
+                          <input type="date" value={form.completion_date} onChange={e => set('completion_date', e.target.value)} className="input" />
+                        </div>
+                        <div>
+                          <label className="label">Completion Remark</label>
+                          <input value={form.completion_remark} onChange={e => set('completion_remark', e.target.value)} className="input" placeholder="Optional admin remark" />
+                        </div>
+                      </div>
+                      <p className="text-xs text-ink-muted mt-3">These fields save directly to the customer table when you press Save.</p>
+                    </div>
+                  )}
 
                   {/* EMI summary preview */}
                   {form.emi_amount && form.emi_tenure && (

@@ -30,6 +30,8 @@ export interface Customer {
   mobile: string;
   alternate_number_1?: string;
   alternate_number_2?: string;
+  reference_name?: string;
+  reference_mobile?: string;
   model_no?: string;
   imei: string;
   purchase_value: number;

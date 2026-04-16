@@ -105,7 +105,7 @@ export default function ApprovalsPage() {
       first_emi_charge_amount: String(req.first_emi_charge_amount || 0),
       total_amount: String(req.total_amount || 0),
       notes: req.notes || '',
-      paid_at: req.approved_at ? req.approved_at.split('T')[0] : '',
+      paid_at: req.approved_at ? req.approved_at.slice(0, 16) : '',
       collected_by_role: '',
     });
     setEditModal(req);
@@ -137,6 +137,25 @@ export default function ApprovalsPage() {
         fetchPending(searchQuery || undefined, statusFilter);
       } else {
         toast.error(data.error || 'Failed to update');
+      }
+    } finally {
+      setEditSaving(false);
+    }
+  }
+
+  async function deletePaymentEdit() {
+    if (!editModal) return;
+    if (!confirm('Delete this payment and remove its paid date from EMI/fine summaries?')) return;
+    setEditSaving(true);
+    try {
+      const res = await fetch(`/api/admin/payments/${editModal.id}`, { method: 'DELETE' });
+      const data = await res.json();
+      if (res.ok) {
+        toast.success('Payment deleted and EMI dates cleared');
+        setEditModal(null);
+        fetchPending(searchQuery || undefined, statusFilter);
+      } else {
+        toast.error(data.error || 'Failed to delete payment');
       }
     } finally {
       setEditSaving(false);
@@ -376,6 +395,7 @@ export default function ApprovalsPage() {
                     <span className={`font-bold ${req.mode === 'UPI' ? 'text-info' : 'text-success'}`}>
                       {req.mode}
                     </span>
+                    {req.utr && <span>· UTR: <span className="font-num">{req.utr}</span></span>}
                     {req.notes && <span>· {req.notes}</span>}
                   </div>
 
@@ -550,7 +570,7 @@ export default function ApprovalsPage() {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="label">Paid / Approved Date</label>
-                  <input type="date" value={editForm.paid_at} onChange={e => setEditForm(f => ({ ...f, paid_at: e.target.value }))} className="input" />
+                  <input type="datetime-local" value={editForm.paid_at} onChange={e => setEditForm(f => ({ ...f, paid_at: e.target.value }))} className="input" />
                 </div>
                 <div>
                   <label className="label">Collected By Role</label>
@@ -575,6 +595,9 @@ export default function ApprovalsPage() {
             </div>
 
             <div className="flex gap-3 mt-6">
+              <button onClick={deletePaymentEdit} disabled={editSaving} className="btn-danger flex-1">
+                Delete Payment
+              </button>
               <button onClick={() => setEditModal(null)} className="btn-ghost flex-1">Cancel</button>
               <button onClick={savePaymentEdit} disabled={editSaving} className="btn-primary flex-1">
                 {editSaving ? 'Saving…' : 'Save Changes'}

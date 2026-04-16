@@ -39,6 +39,7 @@ export default function CustomerDetailPanel({ customer, paidCount, totalEmis, is
       ...(customer.father_name ? [`👨 Father: ${customer.father_name}`] : []),
       `📞 Mobile: ${customer.mobile}`,
       ...(customer.alternate_number_1 ? [`📞 Alt: ${customer.alternate_number_1}`] : []),
+      ...(customer.reference_name ? [`👥 Reference: ${customer.reference_name}${customer.reference_mobile ? ` (${customer.reference_mobile})` : ''}`] : []),
       `📦 Model: ${customer.model_no || 'N/A'}`,
       `🔢 IMEI: ${customer.imei}`,
       `💰 Purchase Value: ${fmt(customer.purchase_value)}`,
@@ -230,6 +231,8 @@ export default function CustomerDetailPanel({ customer, paidCount, totalEmis, is
           { l: 'EMI Due Day', v: `${customer.emi_due_day}th` },
           ...(customer.aadhaar ? [{ l: 'Aadhaar', v: `XXXX ${customer.aadhaar.slice(-4)}`, mono: true }] : []),
           ...(customer.voter_id ? [{ l: 'Voter ID', v: customer.voter_id }] : []),
+          ...(customer.reference_name ? [{ l: 'Reference Name', v: customer.reference_name }] : []),
+          ...(customer.reference_mobile ? [{ l: 'Reference Mobile', v: customer.reference_mobile, mono: true }] : []),
           ...(customer.address ? [{ l: 'Address', v: `${customer.address}${customer.landmark ? `, ${customer.landmark}` : ''}` }] : []),
         ].filter(x => x.v).map(({ l, v, mono, small, accent }) => (
           <div key={l} className="bg-white px-4 py-3">
