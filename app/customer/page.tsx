@@ -7,13 +7,11 @@ import toast from 'react-hot-toast';
 import { calculateTotalFineFromEmis, getPerEmiFineBreakdown } from '@/lib/fineCalc';
 import BroadcastAnimator from '@/components/BroadcastAnimator';
 import SmartAlertPopup from '@/components/SmartAlertPopup';
+import { formatCurrency, formatDateOnly, formatDateTime } from '@/lib/formatters';
 
 const SESSION_KEY = 'emi_customer_session';
 const TOKEN_KEY = 'emi_app_token';
 
-function fmt(n: number) {
-  return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', minimumFractionDigits: 0 }).format(n);
-}
 
 interface CustomerSession {
   customer: Customer;
@@ -223,10 +221,10 @@ export default function CustomerPortal() {
       `Name: ${customer?.customer_name || '-'}`,
       `Mobile: ${customer?.mobile || '-'}`,
       `IMEI: ${customer?.imei || '-'}`,
-      `EMI Due: ${fmt(dueSummary.emiDue)}`,
-      `Base Fine: ${fmt(dueSummary.baseFine)}`,
-      `Weekly Fine: ${fmt(dueSummary.weeklyFine)}`,
-      `Total Amount: ${fmt(totalAmount)}`,
+      `EMI Due: ${formatCurrency(dueSummary.emiDue)}`,
+      `Base Fine: ${formatCurrency(dueSummary.baseFine)}`,
+      `Weekly Fine: ${formatCurrency(dueSummary.weeklyFine)}`,
+      `Total Amount: ${formatCurrency(totalAmount)}`,
       `Date: ${format(new Date(), 'd MMM yyyy, h:mm a')}`,
       'Payment Mode: UPI',
       'UPI Receiver: 7003617029@upi',
@@ -246,10 +244,10 @@ export default function CustomerPortal() {
       `Customer: ${customer?.customer_name || '-'}`,
       `Mobile: ${customer?.mobile || '-'}`,
       `IMEI: ${customer?.imei || '-'}`,
-      `EMI Due: ${fmt(dueSummary.emiDue)}`,
-      `Base Fine: ${fmt(dueSummary.baseFine)}`,
-      `Weekly Fine: ${fmt(dueSummary.weeklyFine)}`,
-      `Total Paid: ${fmt(totalAmount)}`,
+      `EMI Due: ${formatCurrency(dueSummary.emiDue)}`,
+      `Base Fine: ${formatCurrency(dueSummary.baseFine)}`,
+      `Weekly Fine: ${formatCurrency(dueSummary.weeklyFine)}`,
+      `Total Paid: ${formatCurrency(totalAmount)}`,
       `Paid On: ${format(new Date(), 'd MMM yyyy, h:mm a')}`,
     ].join('\n');
     const file = await buildReceiptFile(totalAmount);
@@ -324,7 +322,7 @@ export default function CustomerPortal() {
                       }`}>
                         {loan.status}
                       </span>
-                      <p className="text-sm font-semibold text-ink mt-1">{fmt(loan.emi_amount)}/mo</p>
+                      <p className="text-sm font-semibold text-ink mt-1">{formatCurrency(loan.emi_amount)}/mo</p>
                     </div>
                   </div>
                 </button>
@@ -491,7 +489,7 @@ export default function CustomerPortal() {
               <div>
                 <p className="text-gold-300 font-semibold">1st EMI Charge Pending</p>
                 <p className="text-gold-400/70 text-sm mt-0.5">
-                  A one-time charge of {fmt(breakdown.first_emi_charge_due)} is due. Contact your retailer to pay.
+                  A one-time charge of {formatCurrency(breakdown.first_emi_charge_due)} is due. Contact your retailer to pay.
                 </p>
               </div>
             </div>
@@ -506,7 +504,7 @@ export default function CustomerPortal() {
               <div>
                 <p className="text-crimson-300 font-semibold">Late Fine Due</p>
                 <p className="text-crimson-400/70 text-sm mt-0.5">
-                  A late fine of {fmt(breakdown.fine_due)} applies. Contact your retailer.
+                  A late fine of {formatCurrency(breakdown.fine_due)} applies. Contact your retailer.
                 </p>
               </div>
             </div>
@@ -545,16 +543,16 @@ export default function CustomerPortal() {
             <Field label="Mobile" value={customer?.mobile || ''} mono />
             <Field label="IMEI" value={customer?.imei || ''} mono />
             <Field label="Purchase Date" value={customer?.purchase_date ? format(new Date(customer.purchase_date), 'd MMM yyyy') : ''} />
-            <Field label="Purchase Value" value={fmt(customer?.purchase_value || 0)} mono />
-            <Field label="Down Payment" value={fmt(customer?.down_payment || 0)} mono />
-            {customer?.disburse_amount && <Field label="Financed" value={fmt(customer.disburse_amount)} mono />}
+            <Field label="Purchase Value" value={formatCurrency(customer?.purchase_value || 0)} mono />
+            <Field label="Down Payment" value={formatCurrency(customer?.down_payment || 0)} mono />
+            {customer?.disburse_amount && <Field label="Financed" value={formatCurrency(customer.disburse_amount)} mono />}
           </div>
         </div>
 
         {/* EMI Plan */}
         <div className="card overflow-hidden">
           <div className="px-5 py-3 border-b border-surface-4 flex items-center justify-between">
-            <span className="text-xs font-semibold text-slate-400 uppercase tracking-widest">My EMI Plan</span>
+            <span className="text-xs font-semibold text-slate-500">My EMI Plan</span>
             <div className="flex items-center gap-2 text-xs">
               <span className="text-jade-400 font-semibold">{paidEmis.length} paid</span>
               <span className="text-slate-600">/</span>
@@ -565,7 +563,7 @@ export default function CustomerPortal() {
           <div className="px-5 py-3 border-b border-surface-4">
             <div className="flex items-center justify-between mb-2 text-xs text-slate-500">
               <span>EMI Progress</span>
-              <span className="font-num">{fmt(customer?.emi_amount || 0)} / month</span>
+              <span className="font-num">{formatCurrency(customer?.emi_amount || 0)} / month</span>
             </div>
             <div className="h-2 bg-surface-3 rounded-full overflow-hidden">
               <div
@@ -603,7 +601,7 @@ export default function CustomerPortal() {
                     </div>
                   </div>
                   <div className="text-right">
-                    <p className="font-num text-sm text-ink">{fmt(emi.amount)}</p>
+                    <p className="font-num text-sm text-ink">{formatCurrency(emi.amount)}</p>
                     <div>
                       {emi.status === 'APPROVED' && <span className="text-[10px] text-jade-400 font-semibold">✓ PAID</span>}
                       {emi.status === 'PENDING_APPROVAL' && <span className="text-[10px] text-gold-400 font-semibold">⏳ PENDING</span>}
@@ -622,13 +620,13 @@ export default function CustomerPortal() {
           const totalDue = dueSummary.totalDue;
           return totalDue > 0 ? (
             <div className="card p-5">
-              <p className="text-xs font-semibold text-slate-400 uppercase tracking-widest mb-4">Next Payment Due</p>
+              <p className="text-xs font-semibold text-slate-500 mb-4">Next Payment Due</p>
               <div className="space-y-2.5">
-                {dueSummary.emiDue > 0 && <div className="flex justify-between text-sm"><span className="text-slate-400">EMI #{breakdown?.next_emi_no}</span><span className="font-num text-ink">{fmt(dueSummary.emiDue)}</span></div>}
-                {dueSummary.baseFine > 0 && <div className="flex justify-between text-sm"><span className="text-crimson-400">Base Fine</span><span className="font-num text-crimson-400">{fmt(dueSummary.baseFine)}</span></div>}
-                {dueSummary.weeklyFine > 0 && <div className="flex justify-between text-sm"><span className="text-crimson-400">Weekly Charge</span><span className="font-num text-crimson-400">{fmt(dueSummary.weeklyFine)}</span></div>}
+                {dueSummary.emiDue > 0 && <div className="flex justify-between text-sm"><span className="text-slate-400">EMI #{breakdown?.next_emi_no}</span><span className="font-num text-ink">{formatCurrency(dueSummary.emiDue)}</span></div>}
+                {dueSummary.baseFine > 0 && <div className="flex justify-between text-sm"><span className="text-crimson-400">Base Fine</span><span className="font-num text-crimson-400">{formatCurrency(dueSummary.baseFine)}</span></div>}
+                {dueSummary.weeklyFine > 0 && <div className="flex justify-between text-sm"><span className="text-crimson-400">Weekly Charge</span><span className="font-num text-crimson-400">{formatCurrency(dueSummary.weeklyFine)}</span></div>}
                 <div className="h-px bg-white/[0.06]" />
-                <div className="flex justify-between"><span className="font-semibold text-ink">Total Payable</span><span className="font-num text-xl font-bold text-gold-400">{fmt(totalDue)}</span></div>
+                <div className="flex justify-between"><span className="font-semibold text-ink">Total Payable</span><span className="font-num text-xl font-bold text-gold-400">{formatCurrency(totalDue)}</span></div>
               </div>
               {dueSummary.nextDueDate && <p className="text-xs text-slate-500 mt-3">Due: {format(new Date(dueSummary.nextDueDate), 'd MMM yyyy')}</p>}
               <p className="text-xs text-slate-600 mt-2">Pay online via UPI and auto-share receipt on WhatsApp.</p>
@@ -642,15 +640,15 @@ export default function CustomerPortal() {
           if (!fb.length) return null;
           return (
             <div className="card overflow-hidden">
-              <div className="px-5 py-3 border-b border-surface-4"><span className="text-xs font-semibold text-slate-400 uppercase tracking-widest">⚠️ Fine Details</span></div>
+              <div className="px-5 py-3 border-b border-surface-4"><span className="text-xs font-semibold text-slate-500">⚠️ Fine Details</span></div>
               <div className="divide-y divide-white/[0.03]">
                 {fb.sort((a, b) => a.emi_no - b.emi_no).map(r => (
                   <div key={r.emi_no} className="px-5 py-3 space-y-1">
                     <div className="flex justify-between"><span className="text-sm font-medium text-ink">EMI #{r.emi_no}</span><span className="text-xs text-crimson-400 font-semibold">{r.days}d overdue</span></div>
-                    <div className="flex justify-between text-xs text-slate-500"><span>Base ₹450</span><span className="font-num">{fmt(r.baseFineTotal)}</span></div>
-                    {r.weeklyFine > 0 && <div className="flex justify-between text-xs text-slate-500"><span>+₹25/wk</span><span className="font-num">{fmt(r.weeklyFine)}</span></div>}
-                    <div className="flex justify-between text-sm font-semibold"><span className="text-crimson-400">Total</span><span className="font-num text-crimson-400">{fmt(r.totalFine)}</span></div>
-                    {r.paid > 0 && <div className="flex justify-between text-xs"><span className="text-jade-400">Paid{(() => { const e = sortedEmis.find(x => x.emi_no === r.emi_no); return e?.fine_paid_at ? ` (${new Date(e.fine_paid_at).toLocaleDateString('en-IN', {day:'numeric',month:'short',year:'2-digit'})})` : ''; })()}</span><span className="font-num text-jade-400">-{fmt(r.paid)}</span></div>}
+                    <div className="flex justify-between text-xs text-slate-500"><span>Base ₹450</span><span className="font-num">{formatCurrency(r.baseFineTotal)}</span></div>
+                    {r.weeklyFine > 0 && <div className="flex justify-between text-xs text-slate-500"><span>+₹25/wk</span><span className="font-num">{formatCurrency(r.weeklyFine)}</span></div>}
+                    <div className="flex justify-between text-sm font-semibold"><span className="text-crimson-400">Total</span><span className="font-num text-crimson-400">{formatCurrency(r.totalFine)}</span></div>
+                    {r.paid > 0 && <div className="flex justify-between text-xs"><span className="text-jade-400">Paid{(() => { const e = sortedEmis.find(x => x.emi_no === r.emi_no); return e?.fine_paid_at ? ` (${new Date(e.fine_paid_at).toLocaleDateString('en-IN', {day:'numeric',month:'short',year:'2-digit'})})` : ''; })()}</span><span className="font-num text-jade-400">-{formatCurrency(r.paid)}</span></div>}
                   </div>
                 ))}
               </div>
@@ -680,7 +678,7 @@ export default function CustomerPortal() {
           return (
             <div className="card overflow-hidden">
               <div className="px-5 py-3 border-b border-surface-4">
-                <span className="text-xs font-semibold text-slate-400 uppercase tracking-widest">🧾 Fine History</span>
+                <span className="text-xs font-semibold text-slate-500">🧾 Fine History</span>
               </div>
               <div className="divide-y divide-surface-3">
                 {fineRows.map(r => (
@@ -691,9 +689,9 @@ export default function CustomerPortal() {
                     </div>
                     <div className="mt-1.5 grid grid-cols-2 gap-1.5">
                       <p className="text-slate-500">Detected Date</p><p className="text-right font-num">{r.detectedAt}</p>
-                      <p className="text-slate-500">Total Fine</p><p className="text-right font-num">{fmt(r.total)}</p>
-                      <p className="text-slate-500">Paid</p><p className="text-right font-num text-jade-400">{fmt(r.paid)}</p>
-                      <p className="text-slate-500">Pending</p><p className="text-right font-num text-crimson-400">{fmt(r.pending)}</p>
+                      <p className="text-slate-500">Total Fine</p><p className="text-right font-num">{formatCurrency(r.total)}</p>
+                      <p className="text-slate-500">Paid</p><p className="text-right font-num text-jade-400">{formatCurrency(r.paid)}</p>
+                      <p className="text-slate-500">Pending</p><p className="text-right font-num text-crimson-400">{formatCurrency(r.pending)}</p>
                     </div>
                   </div>
                 ))}
@@ -707,7 +705,7 @@ export default function CustomerPortal() {
           <div className={`glass-card p-4 flex items-center justify-between ${customer?.first_emi_charge_paid_at ? 'border-jade-500/20' : 'border-gold-500/20'}`}>
             <div>
               <p className="text-xs text-slate-500 mb-0.5">1st EMI Charge</p>
-              <p className="font-num font-semibold text-ink">{fmt(customer?.first_emi_charge_amount || 0)}</p>
+              <p className="font-num font-semibold text-ink">{formatCurrency(customer?.first_emi_charge_amount || 0)}</p>
             </div>
             {customer?.first_emi_charge_paid_at ? (
               <span className="badge-approved">✓ Paid</span>
@@ -726,15 +724,15 @@ export default function CustomerPortal() {
           const totalEmiDue = sortedEmis.filter(e => e.status === 'UNPAID').reduce((s, e) => s + e.amount, 0);
           return (
             <div className="card overflow-hidden">
-              <div className="px-5 py-3 border-b border-surface-4"><span className="text-xs font-semibold text-slate-400 uppercase tracking-widest">💳 Payment Summary</span></div>
+              <div className="px-5 py-3 border-b border-surface-4"><span className="text-xs font-semibold text-slate-500">💳 Payment Summary</span></div>
               <div className="px-5 py-4 space-y-2.5">
                 <div className="flex justify-between text-sm"><span className="text-slate-400">EMIs Paid</span><span className="font-num text-jade-400">{paidEmis.length} / {sortedEmis.length}</span></div>
-                <div className="flex justify-between text-sm"><span className="text-slate-400">Total EMI Paid</span><span className="font-num text-jade-400">{fmt(totalEmiPaid)}</span></div>
-                <div className="flex justify-between text-sm"><span className="text-slate-400">EMI Remaining</span><span className="font-num text-ink">{fmt(totalEmiDue)}</span></div>
+                <div className="flex justify-between text-sm"><span className="text-slate-400">Total EMI Paid</span><span className="font-num text-jade-400">{formatCurrency(totalEmiPaid)}</span></div>
+                <div className="flex justify-between text-sm"><span className="text-slate-400">EMI Remaining</span><span className="font-num text-ink">{formatCurrency(totalEmiDue)}</span></div>
                 <div className="h-px bg-white/[0.06]" />
-                <div className="flex justify-between text-sm"><span className="text-crimson-400">Total Fine Accrued</span><span className="font-num text-crimson-400">{fmt(totalFineDue + totalFinePaid)}</span></div>
-                <div className="flex justify-between text-sm"><span className="text-jade-400">Fine Paid</span><span className="font-num text-jade-400">{fmt(totalFinePaid)}</span></div>
-                <div className="flex justify-between text-sm"><span className="text-crimson-400">Fine Remaining</span><span className="font-num text-crimson-400">{fmt(totalFineDue)}</span></div>
+                <div className="flex justify-between text-sm"><span className="text-crimson-400">Total Fine Accrued</span><span className="font-num text-crimson-400">{formatCurrency(totalFineDue + totalFinePaid)}</span></div>
+                <div className="flex justify-between text-sm"><span className="text-jade-400">Fine Paid</span><span className="font-num text-jade-400">{formatCurrency(totalFinePaid)}</span></div>
+                <div className="flex justify-between text-sm"><span className="text-crimson-400">Fine Remaining</span><span className="font-num text-crimson-400">{formatCurrency(totalFineDue)}</span></div>
               </div>
             </div>
           );
@@ -746,13 +744,13 @@ export default function CustomerPortal() {
           if (!paidEmis.length) return null;
           return (
             <div className="card overflow-hidden">
-              <div className="px-5 py-3 border-b border-surface-4"><span className="text-xs font-semibold text-slate-400 uppercase tracking-widest">📅 Payment History</span></div>
+              <div className="px-5 py-3 border-b border-surface-4"><span className="text-xs font-semibold text-slate-500">📅 Payment History</span></div>
               <div className="divide-y divide-white/[0.03]">
                 {paidEmis.map(e => (
                   <div key={e.id} className="px-5 py-2.5 flex justify-between items-center">
                     <div>
-                      <p className="text-sm font-medium text-ink">EMI #{e.emi_no} — {fmt(e.amount)}</p>
-                      {e.fine_paid_amount > 0 && <p className="text-xs text-crimson-400">+ Fine: {fmt(e.fine_paid_amount)}{e.fine_paid_at ? ` (${format(new Date(e.fine_paid_at), 'd MMM yyyy')})` : ''}</p>}
+                      <p className="text-sm font-medium text-ink">EMI #{e.emi_no} — {formatCurrency(e.amount)}</p>
+                      {e.fine_paid_amount > 0 && <p className="text-xs text-crimson-400">+ Fine: {formatCurrency(e.fine_paid_amount)}{e.fine_paid_at ? ` (${format(new Date(e.fine_paid_at), 'd MMM yyyy')})` : ''}</p>}
                     </div>
                     <div className="text-right">
                       <p className="text-xs text-jade-400 font-semibold">✓ Paid</p>
@@ -767,7 +765,7 @@ export default function CustomerPortal() {
 
         <div className="card overflow-hidden">
           <div className="px-5 py-3 border-b border-surface-4" style={{ background: 'linear-gradient(135deg, #fef3c7, #fff7ed)' }}>
-            <span className="text-xs font-bold text-amber-700 uppercase tracking-widest">IMPORTANT NOTE ( নিয়মাবলী )</span>
+            <span className="text-xs font-semibold text-amber-700">IMPORTANT NOTE ( নিয়মাবলী )</span>
           </div>
           <div className="px-5 py-4 text-xs text-slate-500 leading-relaxed">
             <ol className="list-decimal pl-4 space-y-2">
@@ -788,8 +786,8 @@ export default function CustomerPortal() {
           <div className="fixed bottom-0 left-0 right-0 z-[100] md:hidden border-t border-surface-4 bg-white/95 backdrop-blur-md px-4 py-3 safe-bottom">
             <div className="max-w-2xl mx-auto flex items-center gap-3">
               <div className="flex-1">
-                <p className="text-[11px] text-slate-500 uppercase tracking-wide">Total Amount</p>
-                <p className="font-num text-lg font-bold text-ink">{fmt(dueSummary.totalDue)}</p>
+                <p className="text-[11px] text-slate-500">Total Amount</p>
+                <p className="font-num text-lg font-bold text-ink">{formatCurrency(dueSummary.totalDue)}</p>
               </div>
               <button onClick={handleOnlinePay} className="btn-primary px-5" disabled={isLaunchingUpi}>
                 {isLaunchingUpi ? 'Opening...' : 'Pay Online'}
@@ -806,7 +804,7 @@ export default function CustomerPortal() {
 function Field({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
   return (
     <div>
-      <p className="text-xs text-slate-600 mb-0.5 uppercase tracking-wide">{label}</p>
+      <p className="text-xs text-slate-600 mb-0.5">{label}</p>
       <p className={`text-sm text-ink ${mono ? 'font-num' : ''}`}>{value || '—'}</p>
     </div>
   );

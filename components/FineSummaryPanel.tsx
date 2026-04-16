@@ -2,8 +2,8 @@
 import { EMISchedule } from '@/lib/types';
 import { getPerEmiFineBreakdown } from '@/lib/fineCalc';
 import { format } from 'date-fns';
+import { formatCurrency, formatDateOnly } from '@/lib/formatters';
 
-function fmt(n: number) { return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', minimumFractionDigits: 0 }).format(n); }
 
 export default function FineSummaryPanel({ emis, onClose }: { emis: EMISchedule[]; onClose: () => void }) {
   const rows = getPerEmiFineBreakdown(emis);
@@ -23,9 +23,9 @@ export default function FineSummaryPanel({ emis, onClose }: { emis: EMISchedule[
             <div className="card bg-danger-light border border-danger-border p-4 space-y-2">
               <div className="flex justify-between items-center">
                 <span className="font-semibold text-danger">Total Fine Remaining</span>
-                <span className="num text-2xl font-bold text-danger">{fmt(totalRemaining)}</span>
+                <span className="num text-2xl font-bold text-danger">{formatCurrency(totalRemaining)}</span>
               </div>
-              {totalPaid > 0 && <div className="flex justify-between text-sm"><span className="text-success">Total Paid</span><span className="num text-success font-medium">{fmt(totalPaid)}</span></div>}
+              {totalPaid > 0 && <div className="flex justify-between text-sm"><span className="text-success">Total Paid</span><span className="num text-success font-medium">{formatCurrency(totalPaid)}</span></div>}
             </div>
             {rows.map(r => {
               const emi = emis.find(e => e.emi_no === r.emi_no);
@@ -40,20 +40,20 @@ export default function FineSummaryPanel({ emis, onClose }: { emis: EMISchedule[
                 </div>
                 <div className="text-xs text-ink-muted">Due: {format(new Date(r.due_date), 'd MMM yyyy')} · Weekly starts: {format(new Date(r.graceEnds), 'd MMM yyyy')}</div>
                 <div className="h-px bg-surface-4" />
-                <div className="flex justify-between text-xs"><span className="text-ink-muted">Base Fine{r.isLastEmi ? ' (repeating)' : ''}</span><span className="num">{fmt(r.baseFineTotal)}</span></div>
-                {r.weeklyFine > 0 && <div className="flex justify-between text-xs"><span className="text-ink-muted">Weekly ₹25</span><span className="num">{fmt(r.weeklyFine)}</span></div>}
-                <div className="flex justify-between text-sm font-semibold"><span className="text-danger">Total Fine</span><span className="num text-danger">{fmt(r.totalFine)}</span></div>
+                <div className="flex justify-between text-xs"><span className="text-ink-muted">Base Fine{r.isLastEmi ? ' (repeating)' : ''}</span><span className="num">{formatCurrency(r.baseFineTotal)}</span></div>
+                {r.weeklyFine > 0 && <div className="flex justify-between text-xs"><span className="text-ink-muted">Weekly ₹25</span><span className="num">{formatCurrency(r.weeklyFine)}</span></div>}
+                <div className="flex justify-between text-sm font-semibold"><span className="text-danger">Total Fine</span><span className="num text-danger">{formatCurrency(r.totalFine)}</span></div>
                 {r.paid > 0 && (
                   <div className="flex justify-between text-xs">
                     <span className="text-success">Paid{emi?.fine_paid_at ? ` on ${format(new Date(emi.fine_paid_at), 'd MMM yyyy')}` : ''}</span>
-                    <span className="num text-success">-{fmt(r.paid)}</span>
+                    <span className="num text-success">-{formatCurrency(r.paid)}</span>
                   </div>
                 )}
-                <div className="flex justify-between text-sm font-bold"><span className="text-danger">Remaining</span><span className="num text-danger">{fmt(r.remaining)}</span></div>
+                <div className="flex justify-between text-sm font-bold"><span className="text-danger">Remaining</span><span className="num text-danger">{formatCurrency(r.remaining)}</span></div>
               </div>
             );})}
             <div className="card bg-surface-2 p-4 text-xs text-ink-muted space-y-1">
-              <p className="font-bold uppercase tracking-widest mb-1">How Fine Works</p>
+              <p className="font-semibold mb-1">How Fine Works</p>
               <p>• ₹450 base fine when EMI becomes overdue</p>
               <p>• First 30 days: NO weekly — just ₹450</p>
               <p>• After 30 days: +₹25 every 7 days until fine is paid</p>

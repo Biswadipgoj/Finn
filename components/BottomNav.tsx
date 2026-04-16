@@ -19,7 +19,7 @@ export default function BottomNav({ role, pendingCount = 0 }: { role: 'admin' | 
       {/* Spacer so content isn't hidden behind nav */}
       <div className="h-20 sm:hidden" />
       {/* Nav bar */}
-      <nav className="fixed bottom-0 left-0 right-0 z-50 bg-white border-t border-surface-4 sm:hidden no-print safe-bottom">
+      <nav className="fixed bottom-0 left-0 right-0 z-30 bg-white border-t border-surface-4 sm:hidden no-print safe-bottom">
         <div className="flex items-center justify-around h-16 px-2 max-w-lg mx-auto">
           {tabs.map(t => {
             const active = t.exact ? p === t.href : p.startsWith(t.href.split('?')[0]);
