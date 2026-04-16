@@ -8,12 +8,8 @@ import SearchInput from '@/components/SearchInput';
 import toast from 'react-hot-toast';
 import { format } from 'date-fns';
 import Link from 'next/link';
+import { formatCurrency, formatDateTime } from '@/lib/formatters';
 
-function fmt(n: number) {
-  return new Intl.NumberFormat('en-IN', {
-    style: 'currency', currency: 'INR', minimumFractionDigits: 0,
-  }).format(n);
-}
 
 export default function ApprovalsPage() {
   const supabase = createClient();
@@ -370,23 +366,23 @@ export default function ApprovalsPage() {
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
                     <div className="bg-surface-2 rounded-xl p-3">
                       <p className="text-xs text-ink-muted mb-1">EMI Amount</p>
-                      <p className="num font-semibold text-ink">{fmt(req.total_emi_amount)}</p>
+                      <p className="num font-semibold text-ink">{formatCurrency(req.total_emi_amount)}</p>
                     </div>
                     {(req.fine_amount ?? 0) > 0 && (
                       <div className="bg-danger-light border border-danger-border rounded-xl p-3">
                         <p className="text-xs text-danger mb-1">Fine Collected</p>
-                        <p className="num font-semibold text-danger">{fmt(req.fine_amount)}</p>
+                        <p className="num font-semibold text-danger">{formatCurrency(req.fine_amount)}</p>
                       </div>
                     )}
                     {hasFirstCharge && (
                       <div className="bg-brand-50 border border-brand-200 rounded-xl p-3">
                         <p className="text-xs text-brand-600 mb-1">1st EMI Charge</p>
-                        <p className="num font-semibold text-brand-600">{fmt(req.first_emi_charge_amount)}</p>
+                        <p className="num font-semibold text-brand-600">{formatCurrency(req.first_emi_charge_amount)}</p>
                       </div>
                     )}
                     <div className="bg-success-light border border-success-border rounded-xl p-3">
                       <p className="text-xs text-success mb-1">Total to Approve</p>
-                      <p className="num font-bold text-success">{fmt(req.total_amount)}</p>
+                      <p className="num font-bold text-success">{formatCurrency(req.total_amount)}</p>
                     </div>
                   </div>
 

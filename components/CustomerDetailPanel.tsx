@@ -7,6 +7,7 @@ import toast from 'react-hot-toast';
 import Link from 'next/link';
 import PhoneLockBadge from './PhoneLockBadge';
 import CustomerAppDownload from './CustomerAppDownload';
+import { formatCurrency, formatDateOnly } from '@/lib/formatters';
 
 interface Props {
   customer: Customer;
@@ -15,9 +16,6 @@ interface Props {
   isAdmin?: boolean;
 }
 
-function fmt(n: number) {
-  return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', minimumFractionDigits: 0 }).format(n);
-}
 
 export default function CustomerDetailPanel({ customer, paidCount, totalEmis, isAdmin }: Props) {
   const [copiedNum, setCopiedNum] = useState<string | null>(null);
@@ -42,11 +40,11 @@ export default function CustomerDetailPanel({ customer, paidCount, totalEmis, is
       ...(customer.reference_name ? [`👥 Reference: ${customer.reference_name}${customer.reference_mobile ? ` (${customer.reference_mobile})` : ''}`] : []),
       `📦 Model: ${customer.model_no || 'N/A'}`,
       `🔢 IMEI: ${customer.imei}`,
-      `💰 Purchase Value: ${fmt(customer.purchase_value)}`,
-      `⬇️ Down Payment: ${fmt(customer.down_payment)}`,
+      `💰 Purchase Value: ${formatCurrency(customer.purchase_value)}`,
+      `⬇️ Down Payment: ${formatCurrency(customer.down_payment)}`,
       `📅 Purchase Date: ${format(new Date(customer.purchase_date), 'd MMM yyyy')}`,
       `📆 EMI Day: ${customer.emi_due_day}th of each month`,
-      `💳 EMI Amount: ${fmt(customer.emi_amount)}`,
+      `💳 EMI Amount: ${formatCurrency(customer.emi_amount)}`,
       `🗓 Tenure: ${customer.emi_tenure} months`,
     ].join('\n');
   }
@@ -224,9 +222,9 @@ export default function CustomerDetailPanel({ customer, paidCount, totalEmis, is
           { l: 'Retailer', v: retailer?.name },
           ...(retailer?.mobile ? [{ l: 'Retailer Mobile', v: retailer.mobile, mono: true }] : []),
           { l: 'Purchase Date', v: format(new Date(customer.purchase_date), 'd MMM yyyy') },
-          { l: 'Purchase Value', v: fmt(customer.purchase_value), mono: true },
-          { l: 'Down Payment', v: fmt(customer.down_payment), mono: true },
-          { l: 'EMI Amount', v: fmt(customer.emi_amount), mono: true, accent: true },
+          { l: 'Purchase Value', v: formatCurrency(customer.purchase_value), mono: true },
+          { l: 'Down Payment', v: formatCurrency(customer.down_payment), mono: true },
+          { l: 'EMI Amount', v: formatCurrency(customer.emi_amount), mono: true, accent: true },
           { l: 'Tenure', v: `${customer.emi_tenure} months`, mono: true },
           { l: 'EMI Due Day', v: `${customer.emi_due_day}th` },
           ...(customer.aadhaar ? [{ l: 'Aadhaar', v: `XXXX ${customer.aadhaar.slice(-4)}`, mono: true }] : []),
@@ -277,7 +275,7 @@ export default function CustomerDetailPanel({ customer, paidCount, totalEmis, is
         <div className={`px-5 py-3 border-t border-surface-4 flex items-center justify-between ${customer.first_emi_charge_paid_at ? 'bg-success-light' : 'bg-warning-light'}`}>
           <div>
             <p className="text-xs text-ink-muted mb-0.5">1st EMI Charge</p>
-            <p className="num font-bold text-ink">{fmt(customer.first_emi_charge_amount)}</p>
+            <p className="num font-bold text-ink">{formatCurrency(customer.first_emi_charge_amount)}</p>
           </div>
           {customer.first_emi_charge_paid_at
             ? <span className="badge-green">✓ Paid</span>

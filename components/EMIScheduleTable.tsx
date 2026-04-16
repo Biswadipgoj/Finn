@@ -5,6 +5,7 @@ import { EMISchedule } from '@/lib/types';
 import { format, differenceInDays, addDays } from 'date-fns';
 import toast from 'react-hot-toast';
 import { calculateSingleEmiFine } from '@/lib/fineCalc';
+import { formatCurrency, formatDateOnly, formatDateTime } from '@/lib/formatters';
 
 interface Props {
   emis: EMISchedule[];
@@ -27,9 +28,6 @@ type EditForm = {
   fine_waived: boolean;
 };
 
-function fmt(n: number) {
-  return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', minimumFractionDigits: 0 }).format(n);
-}
 
 function toDateInput(value?: string | null) {
   if (!value) return '';
@@ -113,7 +111,7 @@ export default function EMIScheduleTable({ emis, isAdmin, nextUnpaidNo, onRefres
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Failed to update EMI');
-      toast.success('EMI / fine data updated');
+      toast.success('Payment updated successfully');
       setEditingId(null);
       setEditForm(null);
       onRefresh?.();
@@ -179,7 +177,7 @@ export default function EMIScheduleTable({ emis, isAdmin, nextUnpaidNo, onRefres
         </label>
         <div className="sm:col-span-2 lg:col-span-4 flex justify-end gap-2 pt-1">
           <button onClick={() => { setEditingId(null); setEditForm(null); }} className="btn-secondary text-xs px-3 py-2">Cancel</button>
-          <button onClick={() => saveEdit(emi)} disabled={saving} className="btn-success text-xs px-3 py-2">{saving ? 'Saving…' : 'Save to SQL'}</button>
+          <button onClick={() => saveEdit(emi)} disabled={saving} className="btn-success text-xs px-3 py-2">{saving ? 'Saving…' : 'Save Changes'}</button>
         </div>
       </div>
     );
@@ -188,7 +186,7 @@ export default function EMIScheduleTable({ emis, isAdmin, nextUnpaidNo, onRefres
   return (
     <div className="card overflow-hidden">
       <div className="flex items-center justify-between px-5 py-3 border-b border-surface-4 bg-surface-2">
-        <p className="text-xs font-bold text-ink-muted uppercase tracking-widest">EMI Schedule</p>
+        <p className="text-sm font-semibold text-ink-muted">EMI Schedule</p>
         <div className="flex gap-2 text-xs">
           <span className="badge-green">{paidCount} paid</span>
           <span className="badge-gray">{sortedEmis.length} total</span>
@@ -199,13 +197,15 @@ export default function EMIScheduleTable({ emis, isAdmin, nextUnpaidNo, onRefres
         <table className="tbl">
           <thead>
             <tr>
-              <th>#</th>
+              <th>EMI No.</th>
               <th>Due Date</th>
-              <th>Amount</th>
-              <th>Fine</th>
-              <th>Status</th>
-              <th>Paid On</th>
-              <th>Mode</th>
+              <th className="text-right">EMI Amount</th>
+              <th>EMI Status</th>
+              <th>Paid Date</th>
+              <th>Payment Mode</th>
+              <th>UTR</th>
+              <th className="text-right">Fine Amount</th>
+              <th>Fine Paid</th>
               {isAdmin && <th className="text-right">Actions</th>}
             </tr>
           </thead>
@@ -227,13 +227,13 @@ export default function EMIScheduleTable({ emis, isAdmin, nextUnpaidNo, onRefres
 
               return (
                 <tr key={emi.id} className={isOverdue ? 'bg-danger-light/30' : isNext ? 'bg-brand-50/50' : ''}>
-                  <td colSpan={isAdmin && editing ? 8 : 1} className={editing ? 'align-top' : undefined}>
+                  <td colSpan={isAdmin && editing ? 11 : 1} className={editing ? 'align-top' : undefined}>
                     {editing ? (
                       <div>
                         <div className="flex items-center justify-between gap-3">
                           <div>
                             <p className="font-semibold text-ink">Editing EMI #{emi.emi_no}</p>
-                            <p className="text-xs text-ink-muted">Super admin changes are saved directly to Supabase SQL.</p>
+                            <p className="text-xs text-ink-muted">Changes will be applied after saving.</p>
                           </div>
                         </div>
                         {renderEditPanel(emi)}
@@ -255,27 +255,17 @@ export default function EMIScheduleTable({ emis, isAdmin, nextUnpaidNo, onRefres
                           {isOverdue && <p className="text-[10px] text-danger mt-0.5">Overdue by {overdueDays} day{overdueDays !== 1 ? 's' : ''}</p>}
                         </div>
                       </td>
-                      <td className="num font-medium">{fmt(emi.amount)}</td>
-                      <td>
-                        {displayFine > 0 ? (
-                          <div>
-                            <span className="num text-xs font-semibold text-danger">{fmt(fineRemaining > 0 ? fineRemaining : displayFine)}</span>
-                            {finePaid > 0 && <p className="text-[10px] text-success mt-0.5">Paid: {fmt(finePaid)}{emi.fine_paid_at ? ` (${new Date(emi.fine_paid_at).toLocaleDateString('en-IN', {day:'numeric',month:'short',year:'2-digit'})})` : ''}</p>}
-                            {isOverdue && <p className="text-[10px] text-danger/70 mt-0.5">From {format(fineStartDate, 'd MMM')}</p>}
-                          </div>
-                        ) : emi.fine_waived ? (
-                          <span className="text-success text-xs">Waived</span>
-                        ) : (
-                          <span className="text-ink-muted text-xs">—</span>
-                        )}
-                      </td>
                       <td>
                         {emi.status === 'APPROVED' && <span className="badge-blue">✓ Paid</span>}
                         {emi.status === 'PENDING_APPROVAL' && <span className="badge-yellow">⏳ Pending</span>}
                         {emi.status === 'UNPAID' && <span className={`badge ${isOverdue ? 'badge-red' : 'badge-gray'}`}>{isOverdue ? 'Overdue' : 'Unpaid'}</span>}
                       </td>
+                      <td className="num text-right font-medium">{formatCurrency(emi.amount)}</td>
                       <td className="num text-xs text-ink-muted">{emi.paid_at ? format(new Date(emi.paid_at), 'd MMM yyyy, h:mm a') : '—'}</td>
-                      <td className="text-xs text-ink-muted">{emi.mode || '—'}{emi.utr ? <p className="font-num text-[10px]">{emi.utr}</p> : null}</td>
+                      <td className="text-xs text-ink-muted">{emi.mode || '—'}</td>
+                      <td className="font-num text-xs text-ink-muted">{emi.utr || '—'}</td>
+                      <td className="num text-right text-xs font-semibold">{displayFine > 0 ? formatCurrency(displayFine) : emi.fine_waived ? 'Waived' : '—'}</td>
+                      <td className="num text-xs text-ink-muted">{finePaid > 0 ? `${formatCurrency(finePaid)}${emi.fine_paid_at ? ` (${format(new Date(emi.fine_paid_at), 'd MMM yyyy')})` : ''}` : '—'}</td>
                       {isAdmin && (
                         <td className="text-right">
                           <button onClick={() => startEdit(emi)} className="btn-ghost text-xs px-2 py-1">✏ Edit</button>
@@ -312,9 +302,13 @@ export default function EMIScheduleTable({ emis, isAdmin, nextUnpaidNo, onRefres
                 <>
                   <div className="grid grid-cols-2 gap-2 text-xs">
                     <p className="text-ink-muted">Due Date</p><p className="text-right num">{format(dueDate, 'd MMM yyyy')}</p>
-                    <p className="text-ink-muted">Amount</p><p className="text-right num">{fmt(emi.amount)}</p>
-                    <p className="text-ink-muted">Fine</p><p className="text-right num">{displayFine > 0 ? fmt(displayFine) : emi.fine_waived ? 'Waived' : '—'}</p>
-                    <p className="text-ink-muted">Paid On</p><p className="text-right num">{emi.paid_at ? format(new Date(emi.paid_at), 'd MMM yyyy, h:mm a') : '—'}</p>
+                    <p className="text-ink-muted">EMI Amount</p><p className="text-right num">{formatCurrency(emi.amount)}</p>
+                    <p className="text-ink-muted">Status</p><p className="text-right">{emi.status === 'APPROVED' ? 'Paid' : emi.status === 'PENDING_APPROVAL' ? 'Pending Approval' : isOverdue ? 'Due (Overdue)' : 'Due'}</p>
+                    <p className="text-ink-muted">Paid Date</p><p className="text-right num">{emi.paid_at ? format(new Date(emi.paid_at), 'd MMM yyyy, h:mm a') : '—'}</p>
+                    <p className="text-ink-muted">Payment Mode</p><p className="text-right">{emi.mode || '—'}</p>
+                    <p className="text-ink-muted">UTR</p><p className="text-right num">{emi.utr || '—'}</p>
+                    <p className="text-ink-muted">Fine Amount</p><p className="text-right num">{displayFine > 0 ? formatCurrency(displayFine) : emi.fine_waived ? 'Waived' : '—'}</p>
+                    <p className="text-ink-muted">Fine Paid</p><p className="text-right num">{(emi.fine_paid_amount || 0) > 0 ? formatCurrency(emi.fine_paid_amount || 0) : '—'}</p>
                   </div>
                   {isAdmin && <button onClick={() => startEdit(emi)} className="btn-ghost text-xs px-2 py-1 w-full">✏ Edit EMI / Fine</button>}
                 </>

@@ -444,12 +444,12 @@ export default function CustomerFormModal({
                         type="number"
                         value={form.disburse_amount}
                         onChange={e => set('disburse_amount', e.target.value)}
-                        placeholder={autoDisburse > 0 ? `Auto: ${autoDisburse.toLocaleString('en-IN')}` : '0'}
+                        placeholder={autoDisburse > 0 ? `Auto: ${formatCurrency(autoDisburse)}` : '0'}
                         className="input"
                       />
                       {autoDisburse > 0 && !form.disburse_amount && (
                         <p className="text-xs text-ink-muted mt-1">
-                          Auto-calculated: ₹{autoDisburse.toLocaleString('en-IN')}
+                          Auto-calculated: {formatCurrency(autoDisburse)}
                         </p>
                       )}
                     </div>
@@ -533,7 +533,7 @@ export default function CustomerFormModal({
 
                   {isAdmin && customer && (
                     <div className="mt-5 p-4 rounded-xl bg-warning-light border border-warning-border">
-                      <p className="text-xs font-bold uppercase tracking-widest text-warning mb-3">Super Admin Direct SQL Controls</p>
+                      <p className="text-xs font-bold uppercase tracking-widest text-warning mb-3">Admin Actions</p>
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div>
                           <label className="label">Customer Status</label>
@@ -563,7 +563,7 @@ export default function CustomerFormModal({
                           <input value={form.completion_remark} onChange={e => set('completion_remark', e.target.value)} className="input" placeholder="Optional admin remark" />
                         </div>
                       </div>
-                      <p className="text-xs text-ink-muted mt-3">These fields save directly to the customer table when you press Save.</p>
+                      <p className="text-xs text-ink-muted mt-3">Changes will be applied after saving.</p>
                     </div>
                   )}
 
@@ -573,7 +573,7 @@ export default function CustomerFormModal({
                       <div>
                         <p className="text-xs text-ink-muted mb-1">Monthly EMI</p>
                         <p className="num text-brand-700 font-bold">
-                          ₹{parseFloat(form.emi_amount || '0').toLocaleString('en-IN')}
+                          {formatCurrency(parseFloat(form.emi_amount || '0'))}
                         </p>
                       </div>
                       <div>
@@ -583,7 +583,7 @@ export default function CustomerFormModal({
                       <div>
                         <p className="text-xs text-ink-muted mb-1">Total EMI Value</p>
                         <p className="num text-brand-700 font-bold">
-                          ₹{(parseFloat(form.emi_amount || '0') * parseInt(form.emi_tenure || '1')).toLocaleString('en-IN')}
+                          {formatCurrency(parseFloat(form.emi_amount || '0') * parseInt(form.emi_tenure || '1'))}
                         </p>
                       </div>
                     </div>
