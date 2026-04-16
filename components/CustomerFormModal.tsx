@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { Customer, Retailer } from '@/lib/types';
 import { createClient } from '@/lib/supabase/client';
 import toast from 'react-hot-toast';
+import { formatCurrency } from '@/lib/formatters';
 
 interface CustomerFormModalProps {
   customer?: Customer | null;
