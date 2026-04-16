@@ -5,9 +5,9 @@ import { applyApprovedRequestEffects, recomputeCustomerCompletion, reverseApprov
 async function requireSuperAdmin() {
   const supabase = createClient();
   const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return { error: NextResponse.json({ error: 'Unauthorized' }, { status: 401 }) };
+  if (!user) return { error: NextResponse.json({ ok: false, error: 'Unauthorized' }, { status: 401 }) };
   const { data: profile } = await supabase.from('profiles').select('role').eq('user_id', user.id).single();
-  if (profile?.role !== 'super_admin') return { error: NextResponse.json({ error: 'Forbidden — super admin only' }, { status: 403 }) };
+  if (profile?.role !== 'super_admin') return { error: NextResponse.json({ ok: false, error: 'Forbidden — super admin only' }, { status: 403 }) };
   return { user };
 }
 
@@ -31,7 +31,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
       .eq('id', paymentId)
       .single();
 
-    if (fetchErr || !before) return NextResponse.json({ error: 'Payment request not found' }, { status: 404 });
+    if (fetchErr || !before) return NextResponse.json({ ok: false, error: 'Payment request not found' }, { status: 404 });
 
     const body = await req.json().catch(() => ({}));
     const nextStatus = String(body.status ?? before.status);
@@ -70,7 +70,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
       if (before.status === 'APPROVED') {
         await applyApprovedRequestEffects(svc, before, before.approved_by, before.approved_at);
       }
-      return NextResponse.json({ error: updateErr.message }, { status: 500 });
+      return NextResponse.json({ ok: false, error: updateErr.message }, { status: 500 });
     }
 
     const after = { ...before, ...updates };
@@ -79,7 +79,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     }
     await recomputeCustomerCompletion(svc, before.customer_id);
 
-    await svc.from('audit_log').insert({
+    const { error: patchAuditErr } = await svc.from('audit_log').insert({
       actor_user_id: user.id,
       actor_role: 'super_admin',
       action: 'EDIT_PAYMENT',
@@ -88,12 +88,13 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
       before_data: before,
       after_data: after,
       remark: 'Payment updated from approvals edit form',
-    }).catch(() => undefined);
+    });
+    if (patchAuditErr) console.warn('PATCH payment audit_log insert failed', patchAuditErr.message);
 
     return NextResponse.json({ success: true, message: 'Payment updated successfully.', payment: after });
   } catch (error) {
     console.error('PATCH /api/admin/payments/[id] failed', error);
-    return NextResponse.json({ error: error instanceof Error ? error.message : 'Unexpected server error' }, { status: 500 });
+    return NextResponse.json({ ok: false, error: error instanceof Error ? error.message : 'Unexpected server error' }, { status: 500 });
   }
 }
 
@@ -111,7 +112,7 @@ export async function DELETE(_req: NextRequest, { params }: { params: { id: stri
       .eq('id', paymentId)
       .single();
 
-    if (fetchErr || !before) return NextResponse.json({ error: 'Payment request not found' }, { status: 404 });
+    if (fetchErr || !before) return NextResponse.json({ ok: false, error: 'Payment request not found' }, { status: 404 });
 
     if (before.status === 'APPROVED') {
       await reverseApprovedRequestEffects(svc, before);
@@ -124,10 +125,10 @@ export async function DELETE(_req: NextRequest, { params }: { params: { id: stri
         await applyApprovedRequestEffects(svc, before, before.approved_by, before.approved_at);
         await recomputeCustomerCompletion(svc, before.customer_id);
       }
-      return NextResponse.json({ error: deleteErr.message }, { status: 500 });
+      return NextResponse.json({ ok: false, error: deleteErr.message }, { status: 500 });
     }
 
-    await svc.from('audit_log').insert({
+    const { error: deleteAuditErr } = await svc.from('audit_log').insert({
       actor_user_id: user.id,
       actor_role: 'super_admin',
       action: 'DELETE_PAYMENT',
@@ -136,11 +137,12 @@ export async function DELETE(_req: NextRequest, { params }: { params: { id: stri
       before_data: before,
       after_data: { deleted: true },
       remark: 'Payment deleted from approvals edit form',
-    }).catch(() => undefined);
+    });
+    if (deleteAuditErr) console.warn('DELETE payment audit_log insert failed', deleteAuditErr.message);
 
     return NextResponse.json({ success: true, message: 'Payment deleted successfully.' });
   } catch (error) {
     console.error('DELETE /api/admin/payments/[id] failed', error);
-    return NextResponse.json({ error: error instanceof Error ? error.message : 'Unexpected server error' }, { status: 500 });
+    return NextResponse.json({ ok: false, error: error instanceof Error ? error.message : 'Unexpected server error' }, { status: 500 });
   }
 }

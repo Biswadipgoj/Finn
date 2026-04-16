@@ -71,7 +71,10 @@ export async function resolvePaymentRequestItems(svc: Svc, request: RequestRow):
     emi_no: e.emi_no,
     amount: eachAmount,
   }));
-  await svc.from('payment_request_items').insert(backfill).catch(() => undefined);
+  const { error: backfillErr } = await svc.from('payment_request_items').insert(backfill);
+  if (backfillErr) {
+    console.warn('payment_request_items backfill failed', backfillErr.message);
+  }
   return backfill.map(({ emi_schedule_id, emi_no, amount }: any) => ({ emi_schedule_id, emi_no, amount }));
 }
 
