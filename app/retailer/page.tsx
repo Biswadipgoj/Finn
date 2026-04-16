@@ -14,6 +14,7 @@ import { format, differenceInDays } from 'date-fns';
 import Link from 'next/link';
 import { calculateTotalFineFromEmis } from '@/lib/fineCalc';
 import BottomNav from '@/components/BottomNav';
+import RetailerBottomNotice from '@/components/RetailerBottomNotice';
 
 function fmt(n: number) {
   return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', minimumFractionDigits: 0 }).format(n);
@@ -34,6 +35,7 @@ export default function RetailerDashboard() {
     customer_name: string; imei: string; mobile: string;
   }[] | null>(null);
   const [showUpcoming, setShowUpcoming] = useState(false);
+  const [retailerNotice, setRetailerNotice] = useState('Please verify customer details before collecting payment. Submit payment requests before the due date. Late fine status is calculated automatically based on payment timing.');
 
   // Broadcast messages
   const [broadcastPopups, setBroadcastPopups] = useState<{ id: string; message: string; image_url?: string | null; expires_at: string; sender_name?: string; sender_role?: string }[]>([]);
@@ -58,6 +60,7 @@ export default function RetailerDashboard() {
     if (data) {
       setRetailer(data);
       loadMyRequests(data.id);
+      loadRetailerNotice();
       // Load active broadcasts for this retailer
       const { data: broadcasts } = await sb
         .from('broadcast_messages')
@@ -67,6 +70,17 @@ export default function RetailerDashboard() {
         .order('created_at', { ascending: false });
       if (broadcasts?.length) setBroadcastPopups(broadcasts);
     }
+  }
+
+  async function loadRetailerNotice() {
+    const { data } = await supabaseRef.current
+      .from('portal_notices')
+      .select('message')
+      .eq('notice_key', 'retailer_bottom_disclaimer')
+      .eq('audience', 'retailer')
+      .eq('is_active', true)
+      .maybeSingle();
+    if (data?.message) setRetailerNotice(data.message);
   }
 
   async function loadUpcomingEmis(retailerId: string) {
@@ -175,7 +189,7 @@ export default function RetailerDashboard() {
     <div className="min-h-screen page-bg">
       <NavBar role="retailer" userName={retailer?.name || 'Retailer'} />
 
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8 pb-24">
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8 pb-40 sm:pb-28">
         {/* Welcome Banner */}
         <div className="card p-5 mb-8 flex items-center justify-between">
           <div>
@@ -417,11 +431,11 @@ export default function RetailerDashboard() {
             {selectedCustomer.status === 'RUNNING' ? (() => {
               const hasUnpaidEmis = customerEmis.some(e => e.status === 'UNPAID');
               return (
-                <div className="flex justify-end">
+                <div className="sticky bottom-24 sm:bottom-4 z-30 flex justify-end">
                   <button
                     onClick={() => setShowPaymentModal(true)}
                     disabled={!hasUnpaidEmis}
-                    className="btn-primary text-base px-8 py-3.5"
+                    className="btn-primary text-base px-8 py-3.5 shadow-lg"
                   >
                     {!hasUnpaidEmis
                       ? '✓ All EMIs Paid'
@@ -455,6 +469,7 @@ export default function RetailerDashboard() {
           isAdmin={false}
         />
       )}
+      <RetailerBottomNotice message={retailerNotice} hidden={showPaymentModal || !retailer} />
       <BottomNav role="retailer" />
     </div>
   );

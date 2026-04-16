@@ -533,7 +533,7 @@ export default function CustomerFormModal({
 
                   {isAdmin && customer && (
                     <div className="mt-5 p-4 rounded-xl bg-warning-light border border-warning-border">
-                      <p className="text-xs font-bold uppercase tracking-widest text-warning mb-3">Super Admin Direct SQL Controls</p>
+                      <p className="text-xs font-bold uppercase tracking-widest text-warning mb-3">Admin Actions</p>
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div>
                           <label className="label">Customer Status</label>
@@ -563,7 +563,7 @@ export default function CustomerFormModal({
                           <input value={form.completion_remark} onChange={e => set('completion_remark', e.target.value)} className="input" placeholder="Optional admin remark" />
                         </div>
                       </div>
-                      <p className="text-xs text-ink-muted mt-3">These fields save directly to the customer table when you press Save.</p>
+                      <p className="text-xs text-ink-muted mt-3">Changes will be applied after saving.</p>
                     </div>
                   )}
 
