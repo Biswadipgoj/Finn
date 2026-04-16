@@ -3,10 +3,8 @@ import { createServiceClient } from '@/lib/supabase/server';
 import { format } from 'date-fns';
 import { notFound } from 'next/navigation';
 import PrintButton from '@/components/PrintButton';
+import { formatCurrency, formatDateTime } from '@/lib/formatters';
 
-function fmt(n: number) {
-  return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', minimumFractionDigits: 0 }).format(n);
-}
 
 type Status = 'PENDING' | 'APPROVED' | 'REJECTED';
 
@@ -44,7 +42,7 @@ export default async function ReceiptPage({ params }: { params: { id: string } }
   const sm = statusMeta[status];
 
   return (
-    <div style={{ minHeight: '100vh', background: 'linear-gradient(135deg, #fefce8 0%, #f0f9ff 60%, #f8fafc 100%)', padding: '2rem 1rem', fontFamily: 'DM Sans, system-ui, sans-serif' }}>
+    <div style={{ minHeight: '100vh', background: 'linear-gradient(135deg, #fefce8 0%, #f0f9ff 60%, #f8fafc 100%)', padding: '2rem 1rem', fontFamily: '"Noto Sans Bengali", "Noto Sans Devanagari", "Inter", system-ui, sans-serif' }}>
       <div style={{ maxWidth: '480px', margin: '0 auto' }}>
 
         {/* Print / action buttons */}
@@ -102,7 +100,7 @@ export default async function ReceiptPage({ params }: { params: { id: string } }
             <span style={{ fontSize: '0.8rem', color: sm.color, fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
               {sm.emoji} {sm.label}
             </span>
-            <span style={{ fontFamily: 'DM Mono, monospace', fontSize: '0.7rem', color: sm.color }}>
+            <span style={{ fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace', fontSize: '0.7rem', color: sm.color }}>
               #{params.id.slice(0, 8).toUpperCase()}
             </span>
           </div>
@@ -129,22 +127,22 @@ export default async function ReceiptPage({ params }: { params: { id: string } }
             {/* Payment breakdown */}
             <Section title="PAYMENT BREAKDOWN">
               {items.map(i => (
-                <KV key={i.emi_no} label={`EMI #${i.emi_no}`} value={fmt(i.amount)} mono />
+                <KV key={i.emi_no} label={`EMI #${i.emi_no}`} value={formatCurrency(i.amount)} mono />
               ))}
               {items.length === 0 && (request.total_emi_amount ?? 0) > 0 && (
-                <KV label="EMI Amount" value={fmt(request.total_emi_amount)} mono />
+                <KV label="EMI Amount" value={formatCurrency(request.total_emi_amount)} mono />
               )}
               {(request.first_emi_charge_amount ?? 0) > 0 && (
-                <KV label="1st EMI Charge ⭐" value={fmt(request.first_emi_charge_amount)} mono color="#92400e" />
+                <KV label="1st EMI Charge ⭐" value={formatCurrency(request.first_emi_charge_amount)} mono color="#92400e" />
               )}
               {(request.fine_amount ?? 0) > 0 && (
-                <KV label="Late Fine ⚠️" value={fmt(request.fine_amount)} mono color="#991b1b" />
+                <KV label="Late Fine ⚠️" value={formatCurrency(request.fine_amount)} mono color="#991b1b" />
               )}
               <div style={{ height: '1px', background: '#e2e8f0', margin: '0.75rem 0' }} />
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <span style={{ fontWeight: 800, fontSize: '1rem', color: '#1e293b' }}>Total Paid</span>
-                <span style={{ fontFamily: 'DM Mono, monospace', fontWeight: 800, fontSize: '1.5rem', color: '#ca8a04' }}>
-                  {fmt(request.total_amount)}
+                <span style={{ fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace', fontWeight: 800, fontSize: '1.5rem', color: '#ca8a04' }}>
+                  {formatCurrency(request.total_amount)}
                 </span>
               </div>
             </Section>
@@ -180,14 +178,14 @@ export default async function ReceiptPage({ params }: { params: { id: string } }
               <p style={{ fontSize: '0.7rem', color: '#94a3b8' }}>
                 TelePoint EMI Portal · Thank you for your payment
               </p>
-              <p style={{ fontSize: '0.65rem', color: '#cbd5e1', fontFamily: 'DM Mono, monospace', marginTop: '0.2rem' }}>
+              <p style={{ fontSize: '0.65rem', color: '#cbd5e1', fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace', marginTop: '0.2rem' }}>
                 {format(new Date(request.created_at), 'd MMMM yyyy')}
               </p>
             </div>
           </div>
         </div>
 
-        <p style={{ textAlign: 'center', fontSize: '0.7rem', color: '#94a3b8', marginTop: '1.5rem' }}>Created by DIP</p>
+        <p style={{ textAlign: 'center', fontSize: '0.7rem', color: '#94a3b8', marginTop: '1.5rem' }}>TelePoint EMI Portal</p>
       </div>
 
       <style>{`@media print { #no-print { display: none !important; } body { background: white; } }`}</style>
@@ -213,7 +211,7 @@ function KV({ label, value, bold, mono, small, color }: { label: string; value?:
       <span style={{
         fontSize: small ? '0.72rem' : '0.875rem',
         fontWeight: bold ? 700 : 500,
-        fontFamily: mono ? 'DM Mono, monospace' : 'inherit',
+        fontFamily: mono ? 'ui-monospace, SFMono-Regular, Menlo, monospace' : 'inherit',
         color: color ?? '#1e293b',
         textAlign: 'right',
         wordBreak: 'break-all',

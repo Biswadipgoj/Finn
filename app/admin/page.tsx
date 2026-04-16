@@ -14,6 +14,7 @@ import toast from 'react-hot-toast';
 import { calculateTotalFineFromEmis } from '@/lib/fineCalc';
 import BottomNav from '@/components/BottomNav';
 import { addDays, subMonths, format, differenceInDays } from 'date-fns';
+import { formatCurrency, formatDateOnly } from '@/lib/formatters';
 
 type Tab = 'search' | 'retailers' | 'reports' | 'broadcast';
 
@@ -31,9 +32,6 @@ interface FilteredEMI {
   customer_id: string;
 }
 
-function fmt(n: number) {
-  return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', minimumFractionDigits: 0 }).format(n);
-}
 
 async function exportCSV(supabase: ReturnType<typeof createClient>, type: string) {
   toast('Generating report...', { icon: '📊' });
@@ -530,7 +528,7 @@ export default function AdminDashboard() {
             {searchResults !== null && searchResults.length > 1 && !selectedCustomer && (
               <div className="card overflow-hidden animate-fade-in">
                 <div className="px-5 py-3 border-b border-surface-4">
-                  <span className="text-xs text-ink-muted uppercase tracking-widest">{searchResults.length} customers found — click a row to view</span>
+                  <span className="text-xs text-ink-muted">{searchResults.length} customers found — click a row to view</span>
                 </div>
                 <table className="data-table text-xs sm:text-sm">
                   <thead>
@@ -555,7 +553,7 @@ export default function AdminDashboard() {
                             ? <span className="badge bg-danger-light text-danger border border-danger-border">NPA</span>
                             : <span className="badge-complete">Complete</span>}
                         </td>
-                        <td><span className="font-num text-brand-600">{fmt(c.emi_amount)}</span></td>
+                        <td><span className="font-num text-brand-600">{formatCurrency(c.emi_amount)}</span></td>
                         <td>
                           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-ink-muted">
                             <path d="M9 18l6-6-6-6" />
@@ -619,13 +617,13 @@ export default function AdminDashboard() {
                       {breakdown.fine_due > 0 && (
                         <div className="alert-red border-2">
                           <p className="font-bold text-base text-crimson-400">⚠️ Fine Pending</p>
-                          <p className="text-sm font-semibold text-ink-muted mt-0.5">Pending fine: {fmt(breakdown.fine_due)}</p>
+                          <p className="text-sm font-semibold text-ink-muted mt-0.5">Pending fine: {formatCurrency(breakdown.fine_due)}</p>
                         </div>
                       )}
                       {(breakdown.first_emi_charge_due ?? 0) > 0 && (
                         <div className="alert-gold border-2">
-                          <p className="font-bold text-base text-gold-400">⚠️ 1ST EMI CHARGE Pending</p>
-                          <p className="text-sm font-semibold text-ink-muted mt-0.5">Pending amount: {fmt(breakdown.first_emi_charge_due || 0)}</p>
+                          <p className="font-bold text-base text-gold-400">⚠️ First EMI charge pending</p>
+                          <p className="text-sm font-semibold text-ink-muted mt-0.5">Pending amount: {formatCurrency(breakdown.first_emi_charge_due || 0)}</p>
                         </div>
                       )}
                       {daysLeft !== null && daysLeft >= 0 && daysLeft <= 5 && (
@@ -758,7 +756,7 @@ export default function AdminDashboard() {
                                   <p className="text-ink font-medium">{cust?.customer_name || '—'}</p>
                                   <p className="text-xs text-ink-muted font-num">{cust?.imei || ''}</p>
                                 </td>
-                                <td><span className="font-num font-semibold">{fmt(r.total_amount)}</span></td>
+                                <td><span className="font-num font-semibold">{formatCurrency(r.total_amount)}</span></td>
                                 <td><span className={`text-xs font-semibold ${r.mode === 'UPI' ? 'text-info' : 'text-success'}`}>{r.mode}</span></td>
                                 <td>
                                   {r.status === 'PENDING' && <span className="badge-pending">Pending</span>}
@@ -1025,10 +1023,10 @@ export default function AdminDashboard() {
                                   {format(new Date(row.due_date), 'd MMM yyyy')}
                                 </span>
                               </td>
-                              <td><span className="font-num">{fmt(row.amount)}</span></td>
+                              <td><span className="font-num">{formatCurrency(row.amount)}</span></td>
                               <td>
                                 {row.fine_amount > 0
-                                  ? <span className="font-num text-danger text-xs font-semibold">{fmt(row.fine_amount)}</span>
+                                  ? <span className="font-num text-danger text-xs font-semibold">{formatCurrency(row.fine_amount)}</span>
                                   : <span className="text-ink-muted text-xs">—</span>}
                               </td>
                             </tr>
@@ -1293,7 +1291,7 @@ export default function AdminDashboard() {
                 autoFocus
               />
               <p className="text-xs text-ink-muted mt-1">
-                Original loan: {fmt(selectedCustomer.purchase_value - selectedCustomer.down_payment)} · EMI: {fmt(selectedCustomer.emi_amount)} × {selectedCustomer.emi_tenure}
+                Original loan: {formatCurrency(selectedCustomer.purchase_value - selectedCustomer.down_payment)} · EMI: {formatCurrency(selectedCustomer.emi_amount)} × {selectedCustomer.emi_tenure}
               </p>
             </div>
             <div className="flex gap-3">

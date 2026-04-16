@@ -3,10 +3,8 @@ import { createClient } from '@/lib/supabase/server';
 import { format } from 'date-fns';
 import { notFound, redirect } from 'next/navigation';
 import PrintButton from '@/components/PrintButton';
+import { formatCurrency, formatDateOnly } from '@/lib/formatters';
 
-function fmt(n: number) {
-  return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', minimumFractionDigits: 0 }).format(n);
-}
 
 export default async function NOCPage({ params, searchParams }: {
   params: { id: string };
@@ -51,7 +49,7 @@ export default async function NOCPage({ params, searchParams }: {
           <h1 style={{ color:'white', fontFamily:'Georgia,serif', fontSize:'1.75rem', marginBottom:'0.5rem' }}>NOC Blocked</h1>
           <p style={{ color:'#94a3b8', marginBottom:'1.5rem', fontSize:'0.9rem' }}>Cannot generate NOC while a late fine is outstanding.</p>
           <div style={{ background:'rgba(239,68,68,0.1)', border:'1px solid rgba(239,68,68,0.2)', borderRadius:'0.75rem', padding:'1rem', marginBottom:'1.5rem' }}>
-            <p style={{ color:'#fca5a5', fontWeight:'600' }}>Fine Due: {fmt(fineDue)}</p>
+            <p style={{ color:'#fca5a5', fontWeight:'600' }}>Fine Due: {formatCurrency(fineDue)}</p>
             <p style={{ color:'rgba(252,165,165,0.6)', fontSize:'0.75rem', marginTop:'0.25rem' }}>Waive or collect the fine first, then generate NOC.</p>
           </div>
           <a href="/admin" style={{ color:'#e8b800', fontSize:'0.875rem' }}>← Back to Dashboard</a>
@@ -113,16 +111,16 @@ export default async function NOCPage({ params, searchParams }: {
               <DocRow label="IMEI" value={customer.imei} bold />
               {customer.box_no && <DocRow label="Box No." value={customer.box_no} />}
               <DocRow label="Purchase Date" value={format(new Date(customer.purchase_date), 'd MMMM yyyy')} />
-              <DocRow label="Purchase Value" value={fmt(customer.purchase_value)} />
-              <DocRow label="Down Payment" value={fmt(customer.down_payment)} />
+              <DocRow label="Purchase Value" value={formatCurrency(customer.purchase_value)} />
+              <DocRow label="Down Payment" value={formatCurrency(customer.down_payment)} />
             </DocSection>
 
             <DocSection title="EMI SUMMARY">
-              <DocRow label="Monthly EMI" value={`${fmt(customer.emi_amount)} × ${customer.emi_tenure} months`} />
+              <DocRow label="Monthly EMI" value={`${formatCurrency(customer.emi_amount)} × ${customer.emi_tenure} months`} />
               <DocRow label="EMIs Paid" value={`${paidEmis.length} / ${customer.emi_tenure}`} bold />
-              <DocRow label="Total Collected" value={fmt(totalPaid + (customer.first_emi_charge_amount || 0))} bold />
+              <DocRow label="Total Collected" value={formatCurrency(totalPaid + (customer.first_emi_charge_amount || 0))} bold />
               {(customer.first_emi_charge_amount || 0) > 0 && (
-                <DocRow label="1st EMI Charge" value={`${fmt(customer.first_emi_charge_amount)} — ${customer.first_emi_charge_paid_at ? 'PAID' : 'PENDING'}`} />
+                <DocRow label="1st EMI Charge" value={`${formatCurrency(customer.first_emi_charge_amount)} — ${customer.first_emi_charge_paid_at ? 'PAID' : 'PENDING'}`} />
               )}
               <DocRow label="Account Status" value={customer.status} bold />
             </DocSection>
@@ -145,7 +143,7 @@ export default async function NOCPage({ params, searchParams }: {
                         <td style={{ padding:'0.4rem 0.6rem', border:'1px solid #e2e8f0' }}>#{e.emi_no}</td>
                         <td style={{ padding:'0.4rem 0.6rem', border:'1px solid #e2e8f0', fontFamily:'monospace', fontSize:'0.72rem' }}>{format(new Date(e.due_date), 'd MMM yyyy')}</td>
                         <td style={{ padding:'0.4rem 0.6rem', border:'1px solid #e2e8f0', fontFamily:'monospace', fontSize:'0.72rem' }}>{e.paid_at ? format(new Date(e.paid_at), 'd MMM yyyy') : '—'}</td>
-                        <td style={{ padding:'0.4rem 0.6rem', border:'1px solid #e2e8f0', textAlign:'right', fontFamily:'monospace' }}>{fmt(e.amount)}</td>
+                        <td style={{ padding:'0.4rem 0.6rem', border:'1px solid #e2e8f0', textAlign:'right', fontFamily:'monospace' }}>{formatCurrency(e.amount)}</td>
                         <td style={{ padding:'0.4rem 0.6rem', border:'1px solid #e2e8f0', textAlign:'center', fontSize:'0.7rem', fontWeight:'bold' }}>{e.mode || '—'}</td>
                       </tr>
                     ))}
@@ -170,7 +168,7 @@ export default async function NOCPage({ params, searchParams }: {
                   payments for the device <strong>{customer.model_no || 'Mobile Handset'}</strong> bearing IMEI No.{' '}
                   <strong>{customer.imei}</strong>, purchased from TelePoint on{' '}
                   <strong>{format(new Date(customer.purchase_date), 'd MMMM yyyy')}</strong>.
-                  All <strong>{paidEmis.length}</strong> instalments of <strong>{fmt(customer.emi_amount)}</strong> each have been duly received
+                  All <strong>{paidEmis.length}</strong> instalments of <strong>{formatCurrency(customer.emi_amount)}</strong> each have been duly received
                   and the account is now fully settled. TelePoint hereby raises no objection to the complete and
                   absolute ownership of the said device by the above-named individual.
                 </p>
