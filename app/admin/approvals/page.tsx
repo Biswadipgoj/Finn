@@ -128,12 +128,15 @@ export default function ApprovalsPage() {
       });
       const data = await res.json();
       if (res.ok) {
-        toast.success('Payment updated');
+        toast.success('Payment updated successfully');
         setEditModal(null);
         fetchPending(searchQuery || undefined, statusFilter);
       } else {
         toast.error(data.error || 'Failed to update');
       }
+    } catch (error) {
+      console.error('Update payment error:', error);
+      toast.error('Unable to update payment. Please try again.');
     } finally {
       setEditSaving(false);
     }
@@ -153,6 +156,9 @@ export default function ApprovalsPage() {
       } else {
         toast.error(data.error || 'Failed to delete payment');
       }
+    } catch (error) {
+      console.error('Delete payment error:', error);
+      toast.error('Unable to delete payment. Please try again.');
     } finally {
       setEditSaving(false);
     }
@@ -241,26 +247,27 @@ export default function ApprovalsPage() {
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Header */}
-        <div className="flex items-center justify-between mb-8">
+        <div className="flex flex-wrap items-center justify-between gap-3 mb-8">
           <div>
             <h1 className="font-display text-3xl font-bold text-ink">Payment Approvals</h1>
             <p className="text-ink-muted text-sm mt-1">Review and approve retailer payment requests</p>
           </div>
-          <div className="flex items-center gap-3">
-            <div className="flex bg-surface-2 rounded-xl p-1 border border-surface-4">
+          <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+            <a href="/admin" className="btn-ghost whitespace-nowrap">← Dashboard</a>
+            <div className="flex flex-nowrap bg-surface-2 rounded-xl p-1 border border-surface-4 overflow-x-auto">
               <button
                 onClick={() => { setStatusFilter('PENDING'); fetchPending(searchQuery || undefined, 'PENDING'); }}
-                className={`px-4 py-1.5 rounded-lg text-xs font-medium transition-all ${statusFilter === 'PENDING' ? 'bg-brand-500 text-ink shadow' : 'text-ink-muted'}`}
+                className={`px-4 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-all ${statusFilter === 'PENDING' ? 'bg-brand-500 text-ink shadow' : 'text-ink-muted'}`}
               >Pending</button>
               <button
                 onClick={() => { setStatusFilter('ALL'); fetchPending(searchQuery || undefined, 'ALL'); }}
-                className={`px-4 py-1.5 rounded-lg text-xs font-medium transition-all ${statusFilter === 'ALL' ? 'bg-brand-500 text-ink shadow' : 'text-ink-muted'}`}
+                className={`px-4 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-all ${statusFilter === 'ALL' ? 'bg-brand-500 text-ink shadow' : 'text-ink-muted'}`}
               >All Payments</button>
             </div>
             <button
               onClick={loadAllPending}
               disabled={loading}
-              className="btn-ghost flex items-center gap-2"
+              className="btn-ghost flex items-center gap-2 whitespace-nowrap"
             >
             <svg
               width="14" height="14" viewBox="0 0 24 24"
@@ -270,7 +277,7 @@ export default function ApprovalsPage() {
               <path d="M21 12a9 9 0 11-9-9c2.52 0 4.93 1 6.74 2.74L21 8" />
               <path d="M21 3v5h-5" />
             </svg>
-            {loading ? 'Loading…' : 'Load'}
+            {loading ? 'Loading…' : 'Load All Pending'}
           </button>
           </div>
         </div>
