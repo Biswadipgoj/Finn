@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { createClient } from '@/lib/supabase/server';
 import { createServiceClient } from '@/lib/supabase/server';
-import { requireAdmin } from '@/lib/auth';
 
 type ReportRow = {
   customer_id: string;
@@ -15,10 +15,22 @@ type ReportRow = {
 };
 
 export async function GET(req: NextRequest) {
-  const admin = await requireAdmin();
-  if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  const supabase = createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-  const supabase = createServiceClient();
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('role')
+    .eq('user_id', user.id)
+    .single();
+  if (profile?.role !== 'super_admin') {
+    return NextResponse.json({ error: 'Admin only' }, { status: 403 });
+  }
+
+  const serviceClient = createServiceClient();
   const byCustomer = new Map<string, ReportRow>();
 
   function upsertCustomer(customer: any, patch: Partial<ReportRow>) {
@@ -41,7 +53,7 @@ export async function GET(req: NextRequest) {
     byCustomer.set(key, next);
   }
 
-  const { data: fineRows, error: fineErr } = await supabase
+  const { data: fineRows, error: fineErr } = await serviceClient
     .from('emi_schedule')
     .select(`
       customer_id,
@@ -70,7 +82,7 @@ export async function GET(req: NextRequest) {
     });
   }
 
-  const { data: firstChargeRows, error: chargeErr } = await supabase
+  const { data: firstChargeRows, error: chargeErr } = await serviceClient
     .from('customers')
     .select('id, customer_name, imei, model_no, first_emi_charge_amount, retailer:retailers(name)')
     .gt('first_emi_charge_amount', 0)
