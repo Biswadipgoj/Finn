@@ -1,5 +1,7 @@
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Noto+Sans+Bengali:wght@400;500;600;700;800&family=Noto+Sans+Devanagari:wght@400;500;600;700;800&display=swap");
 @tailwind base;
 @tailwind components;
+:root { --font-inter: "Inter"; --font-bengali: "Noto Sans Bengali"; --font-devanagari: "Noto Sans Devanagari"; }
 @tailwind utilities;
 
 /* ── Base ────────────────────────────────────────────────── */
@@ -9,10 +11,29 @@
 html { scroll-behavior: smooth; -webkit-text-size-adjust: 100%; overflow-x: hidden; }
 body {
   background: #f8fafc; color: #1e293b;
-  font-family: 'Noto Sans Bengali', 'Noto Sans Devanagari', 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; line-height: 1.5; word-break: break-word; overflow-wrap: anywhere;
+  font-family: var(--font-inter), var(--font-bengali), var(--font-devanagari), system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  line-height: 1.5;
+  word-break: normal;
+  overflow-wrap: normal;
   overflow-x: hidden; /* Prevent horizontal scroll on mobile */
   -webkit-tap-highlight-color: transparent;
 }
+
+p { overflow-wrap: break-word; }
+
+.content-wrap,
+.notice-text,
+.break-safe {
+  overflow-wrap: break-word;
+  word-break: break-word;
+}
+
+button, a, .badge, .status-badge, .tab, th, td, input, select, label {
+  word-break: normal;
+  overflow-wrap: normal;
+}
+
+button, .badge, .status-badge, .tab, th { white-space: nowrap; }
 
 ::-webkit-scrollbar { width: 5px; height: 5px; }
 ::-webkit-scrollbar-track { background: #f1f5f9; }
@@ -22,6 +43,16 @@ body {
 
 /* ── Component layer ─────────────────────────────────────── */
 @layer components {
+
+  /* Prevent broken vertical button text */
+  button, .btn, .btn-primary, .btn-secondary, .btn-danger, .btn-success, .btn-ghost, .btn-icon, .nav-link, .nav-link-active, .badge, select {
+    word-break: normal;
+    overflow-wrap: normal;
+    white-space: nowrap;
+  }
+  p, li, .notice-text, textarea, input {
+    overflow-wrap: break-word;
+  }
 
   /* Cards */
 .card { @apply bg-white rounded-2xl shadow-card border border-surface-4; }
@@ -71,6 +102,7 @@ body {
   .modal-backdrop {
     @apply fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4
            bg-ink/40 backdrop-blur-sm;
+    z-index: 1000;
   }
   .modal-panel {
     @apply bg-white rounded-t-3xl sm:rounded-2xl w-full sm:max-w-lg max-h-[92vh] overflow-y-auto
@@ -120,16 +152,16 @@ body {
   button, a[role="button"], select { min-height: 44px; }
 
   /* Table → compact on mobile */
-  .tbl td, .tbl th,
-  .data-table td, .data-table th { padding: 0.4rem 0.5rem; font-size: 0.7rem; }
+  .tbl td, .tbl th { padding: 0.55rem 0.65rem; font-size: 0.75rem; }
 
   /* Fix horizontal overflow globally */
-  .card { overflow-x: auto; }
+  .card { overflow-x: visible; }
   main { overflow-x: hidden; }
 
   /* Stack grids on mobile */
   .grid-cols-2, .grid-cols-3, .grid-cols-4 { grid-template-columns: 1fr !important; }
   .sm\:grid-cols-2 { grid-template-columns: 1fr !important; }
+  .mobile-retailer-actions { grid-template-columns: repeat(3, minmax(0, 1fr)) !important; }
 
   /* Responsive max widths */
   .max-w-6xl, .max-w-5xl, .max-w-4xl { max-width: 100% !important; padding-left: 1rem; padding-right: 1rem; }
@@ -205,3 +237,11 @@ body {
 .text-slate-600, .text-slate-700 { color: #94a3b8; }
 .bg-obsidian-700 { @apply bg-surface-3; }
 .bg-obsidian-800, .bg-obsidian-900 { @apply bg-surface-2; }
+
+/* Mobile approval header fixes */
+@media (max-width: 640px) {
+  h1, h2, h3 { word-break: normal; overflow-wrap: break-word; }
+  .mobile-stack { flex-direction: column !important; align-items: stretch !important; }
+  .mobile-full { width: 100% !important; }
+  .mobile-action-row { display: grid !important; grid-template-columns: 1fr 1fr; gap: 0.75rem; }
+}

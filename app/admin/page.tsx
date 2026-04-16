@@ -469,9 +469,9 @@ export default function AdminDashboard() {
 
   return (
     <div className="min-h-screen page-bg">
-      <NavBar role="admin" userName="TELEPOINT" pendingCount={pendingCount} />
+      <NavBar role="admin"  pendingCount={pendingCount} />
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 pb-[calc(96px+env(safe-area-inset-bottom))] sm:pb-8">
         {/* Tab Navigation */}
         <div className="flex items-center gap-1 mb-8 bg-surface-2 rounded-2xl p-1.5 border border-surface-4 overflow-x-auto" style={{ scrollbarWidth: "none", WebkitOverflowScrolling: "touch" }}>
           {([
@@ -653,63 +653,114 @@ export default function AdminDashboard() {
         {/* ===== RETAILERS TAB ===== */}
         {tab === 'retailers' && (
           <div className="space-y-6 animate-fade-in">
-            <div className="flex items-center justify-between">
+            <div className="flex items-start sm:items-center justify-between gap-3 mobile-stack">
               <div>
-                <h1 className="font-display text-3xl font-bold text-ink">Retailer Management</h1>
+                <h1 className="font-sans text-[1.65rem] sm:text-3xl font-bold text-ink leading-tight tracking-normal">Retailer Management</h1>
                 <p className="text-ink-muted text-sm mt-1">{retailers.length} retailers registered</p>
               </div>
               <button
                 onClick={() => { setEditingRetailer(null); setRetailerForm({ name: '', username: '', password: '', retail_pin: '', mobile: '' }); setShowRetailerForm(true); }}
-                className="btn-primary"
+                className="btn-primary w-full sm:w-auto"
               >
                 + Add Retailer
               </button>
             </div>
 
-            <div className="card overflow-hidden">
-              <table className="data-table text-xs sm:text-sm">
-                <thead>
-                  <tr><th>Name</th><th>Username</th><th>Mobile</th><th>Status</th><th>Created</th><th>Actions</th></tr>
-                </thead>
-                <tbody>
-                  {retailers.map((r) => (
-                    <tr key={r.id}>
-                      <td className="font-medium text-ink">{r.name}</td>
-                      <td><span className="font-num text-ink-muted">@{r.username}</span></td>
-                      <td><span className="font-num text-ink-muted">{r.mobile || '—'}</span></td>
-                      <td>{r.is_active ? <span className="badge-running">Active</span> : <span className="badge-rejected">Inactive</span>}</td>
-                      <td className="text-xs text-ink-muted">{format(new Date(r.created_at), 'd MMM yyyy')}</td>
-                      <td>
-                        <div className="flex items-center gap-2">
-                          <button
-                            onClick={() => { setEditingRetailer(r); setRetailerForm({ name: r.name, username: r.username, password: '', retail_pin: '', mobile: r.mobile || '' }); setShowRetailerForm(true); }}
-                            className="px-3 py-1 text-xs border border-surface-4 hover:border-brand-300 hover:text-brand-600 rounded-lg transition-colors text-ink-muted"
-                          >
-                            Edit
-                          </button>
-                          <button
-                            onClick={() => handleToggleRetailerActive(r)}
-                            className={`px-3 py-1 text-xs border rounded-lg transition-colors ${
-                              r.is_active ? 'border-danger-border hover:border-danger text-danger' : 'border-success-border hover:border-jade-500/40 text-success'
-                            }`}
-                          >
-                            {r.is_active ? 'Deactivate' : 'Activate'}
-                          </button>
-                          <button
-                            onClick={() => handleDeleteRetailer(r.id)}
-                            className="px-3 py-1 text-xs border border-danger-border hover:border-danger text-danger rounded-lg transition-colors"
-                          >
-                            Delete
-                          </button>
-                        </div>
-                      </td>
+            <div className="space-y-3 md:hidden">
+              {retailers.map((r) => (
+                <article key={r.id} className="card p-4 space-y-3">
+                  <div>
+                    <h2 className="text-base font-semibold text-ink leading-snug">{r.name}</h2>
+                    <p className="text-sm text-ink-muted mt-0.5 whitespace-nowrap">@{r.username}</p>
+                  </div>
+                  <div className="space-y-1 text-sm">
+                    <p className="text-ink-muted"><span className="font-medium text-ink">Mobile:</span> <span className="font-num">{r.mobile || '—'}</span></p>
+                    <p className="text-ink-muted flex items-center gap-2">
+                      <span className="font-medium text-ink">Status:</span>
+                      {r.is_active
+                        ? <span className="badge-running whitespace-nowrap">Active</span>
+                        : <span className="badge-rejected whitespace-nowrap">Inactive</span>}
+                    </p>
+                    <p className="text-ink-muted"><span className="font-medium text-ink">Created:</span> {format(new Date(r.created_at), 'd MMM yyyy')}</p>
+                  </div>
+                  <div className="mobile-retailer-actions grid gap-2">
+                    <button
+                      onClick={() => { setEditingRetailer(r); setRetailerForm({ name: r.name, username: r.username, password: '', retail_pin: '', mobile: r.mobile || '' }); setShowRetailerForm(true); }}
+                      className="btn-secondary text-xs px-2"
+                    >
+                      Edit
+                    </button>
+                    <button
+                      onClick={() => handleToggleRetailerActive(r)}
+                      className={`text-xs px-2 ${r.is_active ? 'btn-danger' : 'btn-success'}`}
+                    >
+                      {r.is_active ? 'Deactivate' : 'Activate'}
+                    </button>
+                    <button
+                      onClick={() => handleDeleteRetailer(r.id)}
+                      className="btn-danger text-xs px-2"
+                    >
+                      Delete
+                    </button>
+                  </div>
+                </article>
+              ))}
+              {retailers.length === 0 && (
+                <div className="card p-10 text-center text-ink-muted">No retailers yet. Add one to get started.</div>
+              )}
+            </div>
+
+            <div className="card overflow-hidden hidden md:block">
+              <div className="overflow-x-auto">
+                <table className="data-table text-sm min-w-[880px]">
+                  <thead>
+                    <tr>
+                      <th className="whitespace-nowrap">Name</th>
+                      <th className="whitespace-nowrap">Username</th>
+                      <th className="whitespace-nowrap">Mobile</th>
+                      <th className="whitespace-nowrap">Status</th>
+                      <th className="whitespace-nowrap">Created</th>
+                      <th className="whitespace-nowrap">Actions</th>
                     </tr>
-                  ))}
-                  {retailers.length === 0 && (
-                    <tr><td colSpan={5} className="text-center text-ink-muted py-10">No retailers yet. Add one to get started.</td></tr>
-                  )}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {retailers.map((r) => (
+                      <tr key={r.id}>
+                        <td className="font-medium text-ink">{r.name}</td>
+                        <td><span className="font-num text-ink-muted whitespace-nowrap">@{r.username}</span></td>
+                        <td><span className="font-num text-ink-muted whitespace-nowrap">{r.mobile || '—'}</span></td>
+                        <td>{r.is_active ? <span className="badge-running whitespace-nowrap">Active</span> : <span className="badge-rejected whitespace-nowrap">Inactive</span>}</td>
+                        <td className="text-xs text-ink-muted whitespace-nowrap">{format(new Date(r.created_at), 'd MMM yyyy')}</td>
+                        <td>
+                          <div className="flex items-center gap-2">
+                            <button
+                              onClick={() => { setEditingRetailer(r); setRetailerForm({ name: r.name, username: r.username, password: '', retail_pin: '', mobile: r.mobile || '' }); setShowRetailerForm(true); }}
+                              className="btn-secondary text-xs px-3"
+                            >
+                              Edit
+                            </button>
+                            <button
+                              onClick={() => handleToggleRetailerActive(r)}
+                              className={`text-xs px-3 ${r.is_active ? 'btn-danger' : 'btn-success'}`}
+                            >
+                              {r.is_active ? 'Deactivate' : 'Activate'}
+                            </button>
+                            <button
+                              onClick={() => handleDeleteRetailer(r.id)}
+                              className="btn-danger text-xs px-3"
+                            >
+                              Delete
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                    {retailers.length === 0 && (
+                      <tr><td colSpan={6} className="text-center text-ink-muted py-10">No retailers yet. Add one to get started.</td></tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
             </div>
           </div>
         )}

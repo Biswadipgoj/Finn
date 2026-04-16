@@ -5,7 +5,7 @@ import toast from 'react-hot-toast';
 import { format } from 'date-fns';
 import { calculateTotalFineFromEmis } from '@/lib/fineCalc';
 import FineSummaryPanel from './FineSummaryPanel';
-import { formatCurrency, formatDateTime } from '@/lib/formatters';
+import { formatCurrency, formatDateOnly } from '@/lib/formatters';
 
 interface Props { customer: Customer; emis: EMISchedule[]; breakdown: DueBreakdown | null; onClose: () => void; onSubmitted: () => void; isAdmin?: boolean; }
 const UPI_ID = 'biswajit.khanra82@axl';
@@ -137,7 +137,7 @@ export default function PaymentModal({ customer, emis, breakdown, onClose, onSub
 
   return (
     <div className="modal-backdrop" role="dialog" aria-modal="true" aria-label="Payment collection form" onClick={e => e.target === e.currentTarget && onClose()}>
-      <div className="modal-panel flex flex-col">
+      <div className="modal-panel flex flex-col h-[100dvh] sm:h-auto sm:max-h-[92vh]">
         <div className="sticky top-0 z-10 bg-white border-b border-surface-4 px-4 py-3 flex items-center justify-between">
           <div>
             <h2 className="font-bold text-ink text-base sm:text-lg">{isAdmin ? 'Update Payment' : 'Collect Payment'}</h2>
@@ -145,18 +145,18 @@ export default function PaymentModal({ customer, emis, breakdown, onClose, onSub
           </div>
           <button aria-label="Close payment modal" onClick={onClose} className="btn-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M18 6L6 18M6 6l12 12"/></svg></button>
         </div>
-        <div className="p-4 space-y-4 overflow-y-auto pb-32 sm:pb-6">
+        <div className="flex-1 p-4 space-y-4 overflow-y-auto pb-32 sm:pb-8">
           <div className="card bg-surface-2 p-4">
             <p className="text-sm font-semibold text-ink">{customer.customer_name}</p>
             <p className="text-xs text-ink-muted mt-1">Mobile: {customer.mobile} · IMEI: {customer.imei}</p>
           </div>
           {/* WHAT TO COLLECT — checkboxes */}
           <div className="card bg-surface-2 p-4 space-y-3">
-            <p className="text-xs font-bold text-ink-muted uppercase tracking-widest">EMI and Fine Details</p>
+            <p className="text-sm font-semibold text-ink-muted">EMI and Fine Details</p>
             <label className={`flex items-center justify-between p-3 rounded-xl border-2 cursor-pointer transition-all ${collectEmi ? 'border-brand-400 bg-brand-50' : 'border-surface-4'}`}>
               <div className="flex items-center gap-3">
                 <input type="checkbox" checked={collectEmi} onChange={e => setCollectEmi(e.target.checked)} className="w-5 h-5 accent-brand-500 rounded" />
-                  <div><p className="text-sm font-semibold text-ink">EMI #{selectedEmiNo || '—'}</p><p className="text-xs text-ink-muted">EMI Amount: {fmt(scheduledEmiAmount)}</p></div>
+                  <div><p className="text-sm font-semibold text-ink">EMI #{selectedEmiNo || '—'}</p><p className="text-xs text-ink-muted">EMI Amount: {formatCurrency(scheduledEmiAmount)}</p></div>
               </div>
               <span className="num font-semibold text-ink">{formatCurrency(scheduledEmiAmount)}</span>
             </label>
@@ -198,7 +198,7 @@ export default function PaymentModal({ customer, emis, breakdown, onClose, onSub
                     <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${sel ? 'bg-brand-500 border-brand-500' : 'border-surface-4'}`}>{sel && <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="4"><path d="M20 6L9 17l-5-5"/></svg>}</div>
                     <span className={`text-sm font-semibold ${sel ? 'text-brand-700' : 'text-ink'}`}>EMI #{emi.emi_no}</span>
                   </div>
-                  <div className="text-right"><span className="num text-sm font-semibold">{formatCurrency(emi.amount)}</span><br/><span className={`text-[10px] ${isOverdue ? 'text-danger' : 'text-ink-muted'}`}>{format(new Date(emi.due_date), 'd MMM')}{isOverdue && ' ⚠'}</span></div>
+                  <div className="text-right"><span className="num text-sm font-semibold">{formatCurrency(emi.amount)}</span><br/><span className={`text-[10px] ${isOverdue ? 'text-danger' : 'text-ink-muted'}`}>{formatDateOnly(emi.due_date).split(' ').slice(0, 2).join(' ')}{isOverdue && ' overdue'}</span></div>
                 </button>);
               })}</div>
             )}
@@ -233,11 +233,11 @@ export default function PaymentModal({ customer, emis, breakdown, onClose, onSub
           {/* Total */}
           <div className="flex items-center justify-between px-4 py-3 rounded-xl bg-brand-50 border border-brand-200">
             <span className="font-bold text-ink">Total Payable</span>
-            <span className="num text-2xl font-bold text-brand-600">{fmt(total)}</span>
+            <span className="num text-2xl font-bold text-brand-600">{formatCurrency(total)}</span>
           </div>
 
         </div>
-        <div className="sticky bottom-0 z-20 bg-white border-t border-surface-4 p-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] flex gap-3">
+        <div className="sticky bottom-0 z-30 bg-white border-t border-surface-4 p-3 pb-[calc(0.85rem+env(safe-area-inset-bottom))] flex gap-3 shadow-[0_-8px_20px_rgba(15,23,42,0.06)]">
           <button onClick={onClose} className="btn-secondary flex-1 py-3">Cancel</button>
           <button onClick={handleSubmit} disabled={cannotSubmit} className="btn-primary flex-1 py-3 disabled:opacity-50">{loading ? 'Saving...' : isAdmin ? 'Update Payment' : 'Submit Payment Request'}</button>
         </div>

@@ -30,7 +30,7 @@ export default function NavBar({ role, pendingCount = 0 }: NavBarProps) {
               <circle cx="16" cy="14" r="4" fill="white" />
             </svg>
           </div>
-          <span className="font-display font-bold text-ink text-base hidden sm:inline">TelePoint</span>
+          <span className="font-display font-bold text-ink text-base hidden sm:inline">EMI Portal</span>
         </div>
 
         {/* Desktop nav links — hidden on mobile (BottomNav handles mobile) */}

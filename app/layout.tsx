@@ -3,8 +3,8 @@ import './globals.css';
 import { Toaster } from 'react-hot-toast';
 
 export const metadata: Metadata = {
-  title: 'TelePoint EMI Portal',
-  description: 'Professional EMI collection and account management portal',
+  title: 'EMI Management Portal',
+  description: 'Secure EMI collection and account management portal',
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

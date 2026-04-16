@@ -8,9 +8,9 @@ module.exports = {
   theme: {
     extend: {
       fontFamily: {
-        display: ['DM Sans', 'Georgia', 'serif'],
-        sans: ['DM Sans', 'system-ui', 'sans-serif'],
-        mono: ['DM Mono', 'ui-monospace', 'monospace'],
+        display: ['var(--font-inter)', 'var(--font-bengali)', 'var(--font-devanagari)', 'system-ui', 'sans-serif'],
+        sans: ['var(--font-inter)', 'var(--font-bengali)', 'var(--font-devanagari)', 'system-ui', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'sans-serif'],
+        mono: ['ui-monospace', 'SFMono-Regular', 'Menlo', 'Monaco', 'Consolas', 'monospace'],
       },
       colors: {
         brand: {

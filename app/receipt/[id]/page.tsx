@@ -143,7 +143,7 @@ export default async function ReceiptPage({ params }: { params: { id: string } }
                 <span style={{ fontWeight: 800, fontSize: '1rem', color: '#1e293b' }}>Total Paid</span>
                 <span style={{ fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace', fontWeight: 800, fontSize: '1.5rem', color: '#ca8a04' }}>
                   {formatCurrency(request.total_amount)}
-                  {fmt(request.total_amount)}
+                  {formatCurrency(request.total_amount)}
                 </span>
               </div>
             </Section>
