@@ -612,27 +612,26 @@ export default function AdminDashboard() {
                 </div>
 
                 <CustomerDetailPanel customer={selectedCustomer} paidCount={paidCount} totalEmis={selectedCustomer.emi_tenure} isAdmin={true} />
-                <PaymentSummaryCard customer={selectedCustomer} emis={customerEmis} breakdown={breakdown} />
                 {breakdown && (() => {
                   const daysLeft = breakdown.next_emi_due_date ? differenceInDays(new Date(breakdown.next_emi_due_date), new Date()) : null;
                   return (
                     <div className="space-y-2">
                       {breakdown.fine_due > 0 && (
-                        <div className="alert-red border-2">
-                          <p className="font-bold text-base text-crimson-400">⚠️ Fine Pending</p>
-                          <p className="text-sm font-semibold text-ink-muted mt-0.5">Pending fine: {fmt(breakdown.fine_due)}</p>
+                        <div className="alert-red border">
+                          <p className="font-semibold text-sm text-crimson-400">Fine pending</p>
+                          <p className="text-sm text-ink-muted mt-0.5">Outstanding fine: {fmt(breakdown.fine_due)}</p>
                         </div>
                       )}
                       {(breakdown.first_emi_charge_due ?? 0) > 0 && (
-                        <div className="alert-gold border-2">
-                          <p className="font-bold text-base text-gold-400">⚠️ 1ST EMI CHARGE Pending</p>
-                          <p className="text-sm font-semibold text-ink-muted mt-0.5">Pending amount: {fmt(breakdown.first_emi_charge_due || 0)}</p>
+                        <div className="alert-gold border">
+                          <p className="font-semibold text-sm text-gold-400">First EMI charge pending</p>
+                          <p className="text-sm text-ink-muted mt-0.5">Outstanding amount: {fmt(breakdown.first_emi_charge_due || 0)}</p>
                         </div>
                       )}
                       {daysLeft !== null && daysLeft >= 0 && daysLeft <= 5 && (
-                        <div className="alert-blue border-2">
-                          <p className="font-bold text-base text-sapphire-400">🔔 EMI Upcoming in {daysLeft} day{daysLeft === 1 ? '' : 's'}</p>
-                          <p className="text-sm font-semibold text-ink-muted mt-0.5">
+                        <div className="alert-blue border">
+                          <p className="font-semibold text-sm text-sapphire-400">Upcoming EMI in {daysLeft} day{daysLeft === 1 ? '' : 's'}</p>
+                          <p className="text-sm text-ink-muted mt-0.5">
                             EMI #{breakdown.next_emi_no ?? '—'} due on {breakdown.next_emi_due_date ? format(new Date(breakdown.next_emi_due_date), 'd MMM yyyy') : '—'}
                           </p>
                         </div>
@@ -648,6 +647,7 @@ export default function AdminDashboard() {
                   onRefresh={refreshSelectedCustomer}
                   defaultFineAmount={fineSettings.default_fine_amount}
                 />
+                <PaymentSummaryCard customer={selectedCustomer} emis={customerEmis} breakdown={breakdown} />
               </div>
             )}
           </div>
