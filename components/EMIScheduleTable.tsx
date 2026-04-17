@@ -21,7 +21,8 @@ type EditForm = {
   amount: string;
   status: EMISchedule['status'];
   partial_paid_amount: string;
-  collected_at: string;
+  partial_paid_at: string;
+  paid_at: string;
   mode: '' | 'CASH' | 'UPI';
   utr: string;
   fine_amount: string;
@@ -69,7 +70,8 @@ function buildEditForm(emi: EMISchedule): EditForm {
     amount: String(emi.amount ?? 0),
     status: emi.status,
     partial_paid_amount: String(emi.partial_paid_amount ?? 0),
-    collected_at: isoToLocalInput(emi.paid_at || emi.partial_paid_at),
+    partial_paid_at: isoToLocalInput(emi.partial_paid_at),
+    paid_at: isoToLocalInput(emi.paid_at),
     mode: (emi.mode || '') as EditForm['mode'],
     utr: emi.utr || '',
     fine_amount: String(emi.fine_amount ?? 0),
@@ -103,7 +105,8 @@ export default function EMIScheduleTable({ emis, isAdmin, nextUnpaidNo, onRefres
         amount: Number(editForm.amount || emi.amount),
         status: editForm.status,
         partial_paid_amount: Number(editForm.partial_paid_amount || 0),
-        collected_at: editForm.collected_at || null,
+        partial_paid_at: editForm.partial_paid_at || null,
+        paid_at: editForm.paid_at || null,
         mode: editForm.mode || null,
         utr: editForm.utr.trim() || null,
         fine_amount: Number(editForm.fine_amount || 0),
@@ -219,7 +222,8 @@ export default function EMIScheduleTable({ emis, isAdmin, nextUnpaidNo, onRefres
                     </select>
 
                     <input type="number" value={editForm.partial_paid_amount} onChange={e => setField('partial_paid_amount', e.target.value)} className="input py-2 text-sm" placeholder="EMI Paid Amount" />
-                    <input type="datetime-local" value={editForm.collected_at} onChange={e => setField('collected_at', e.target.value)} className="input py-2 text-sm" />
+                    <input type="datetime-local" value={editForm.partial_paid_at} onChange={e => setField('partial_paid_at', e.target.value)} className="input py-2 text-sm" />
+                    <input type="datetime-local" value={editForm.paid_at} onChange={e => setField('paid_at', e.target.value)} className="input py-2 text-sm" />
                     <select value={editForm.mode} onChange={e => setField('mode', e.target.value as EditForm['mode'])} className="input py-2 text-sm">
                       <option value="">Payment Mode</option>
                       <option value="CASH">CASH</option>

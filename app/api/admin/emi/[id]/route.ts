@@ -79,12 +79,6 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
       updated_at: new Date().toISOString(),
     };
 
-    if (body.collected_at !== undefined) {
-      const collectedAt = toIsoOrNull(body.collected_at);
-      payload.partial_paid_at = collectedAt;
-      payload.paid_at = nextStatus === 'APPROVED' ? collectedAt : null;
-    }
-
     if (nextStatus === 'APPROVED' && !payload.paid_at) {
       payload.paid_at = new Date().toISOString();
       payload.partial_paid_amount = Math.max(emiAmount, paidAmount);

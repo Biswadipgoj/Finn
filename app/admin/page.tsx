@@ -22,7 +22,7 @@ type Tab = 'search' | 'retailers' | 'reports' | 'broadcast';
 interface FilteredEMI {
   id: string;
   emi_no: number;
-  due_date: string;
+  due_date?: string | null;
   amount: number;
   status: string;
   fine_amount: number;
@@ -31,6 +31,8 @@ interface FilteredEMI {
   mobile: string;
   retailer_name: string;
   customer_id: string;
+  first_emi_charge_paid?: number;
+  first_emi_charge_remaining?: number;
 }
 
 const fmt = formatCurrency;
@@ -426,9 +428,30 @@ export default function AdminDashboard() {
       } else if (filterKey === 'first_emi_due') {
         query = query.eq('emi_no', 1);
       } else if (filterKey === 'first_emi_charge_due') {
-        const { data: cc } = await supabase.from('customers').select('id, customer_name, imei, mobile, first_emi_charge_amount, retailer:retailers(name)').gt('first_emi_charge_amount', 0).is('first_emi_charge_paid_at', null).eq('status', 'RUNNING');
-        setFilteredEmis((cc || []).map((r: Record<string, unknown>) => ({ id: r.id as string, emi_no: 0, due_date: '', amount: r.first_emi_charge_amount as number, status: 'CHARGE_DUE', fine_amount: 0, customer_name: r.customer_name as string || '', imei: r.imei as string || '', mobile: r.mobile as string || '', retailer_name: ((r.retailer as {name?:string}|null)?.name) || '', customer_id: r.id as string })));
-        setFilterLoading(false); return;
+        const res = await fetch('/api/report/first-emi-charge-due', { cache: 'no-store' });
+        const payload = await readJsonSafe<{ ok?: boolean; data?: Record<string, unknown>[]; error?: string }>(res);
+        if (!res.ok || !payload?.ok) {
+          toast.error(payload?.error || 'Failed to load first EMI charge due report');
+          setFilteredEmis([]);
+          return;
+        }
+
+        setFilteredEmis((payload.data || []).map((row) => ({
+          id: String(row.id || row.customer_id || ''),
+          emi_no: 0,
+          due_date: (row.due_date as string | null) || null,
+          amount: Number(row.first_emi_charge_amount || 0),
+          status: String(row.status || 'UNPAID'),
+          fine_amount: 0,
+          customer_name: String(row.customer_name || '-'),
+          imei: String(row.imei || '-'),
+          mobile: String(row.mobile || '-'),
+          retailer_name: String(row.retailer_name || '-'),
+          customer_id: String(row.customer_id || row.id || ''),
+          first_emi_charge_paid: Number(row.first_emi_charge_paid || 0),
+          first_emi_charge_remaining: Number(row.first_emi_charge_remaining || 0),
+        })));
+        return;
       } else if (days) {
         const target = addDays(today, days).toISOString().split('T')[0];
         query = query.lte('due_date', target).gte('due_date', today.toISOString().split('T')[0]);
@@ -1036,12 +1059,21 @@ export default function AdminDashboard() {
                   </div>
 
                   {filteredEmis.length === 0 ? (
-                    <p className="text-ink-muted text-sm py-4">No EMIs match this filter.</p>
+                    <p className="text-ink-muted text-sm py-4">
+                      {activeFilter === 'first_emi_charge_due' ? 'No first EMI charge dues found.' : 'No EMIs match this filter.'}
+                    </p>
                   ) : (
                     <div className="card overflow-hidden">
                       <table className="data-table text-xs sm:text-sm">
                         <thead>
-                          <tr><th>Customer</th><th>IMEI</th><th>Mobile</th><th>Retailer</th><th>EMI #</th><th>Due Date</th><th>Amount</th><th>Fine</th></tr>
+                          <tr>
+                            <th>Customer</th><th>IMEI</th><th>Mobile</th><th>Retailer</th>
+                            <th>{activeFilter === 'first_emi_charge_due' ? 'Status' : 'EMI #'}</th>
+                            <th>Due Date</th>
+                            <th>{activeFilter === 'first_emi_charge_due' ? '1st Charge Amount' : 'Amount'}</th>
+                            <th>{activeFilter === 'first_emi_charge_due' ? 'Paid' : 'Fine'}</th>
+                            {activeFilter === 'first_emi_charge_due' && <th>Remaining</th>}
+                          </tr>
                         </thead>
                         <tbody>
                           {filteredEmis.map((row) => (
@@ -1050,18 +1082,33 @@ export default function AdminDashboard() {
                               <td><span className="font-num text-xs">{row.imei}</span></td>
                               <td><span className="font-num text-ink-muted">{row.mobile}</span></td>
                               <td className="text-ink-muted">{row.retailer_name}</td>
-                              <td><span className="font-num">#{row.emi_no}</span></td>
                               <td>
-                                <span className={`font-num text-xs ${new Date(row.due_date) < new Date() ? 'text-danger font-semibold' : 'text-ink-muted'}`}>
-                                  {format(new Date(row.due_date), 'd MMM yyyy')}
-                                </span>
+                                {activeFilter === 'first_emi_charge_due'
+                                  ? <span className="text-xs font-semibold text-warning">{row.status === 'PARTIALLY_PAID' ? 'PARTIALLY PAID' : 'UNPAID'}</span>
+                                  : <span className="font-num">#{row.emi_no}</span>}
+                              </td>
+                              <td>
+                                {row.due_date ? (
+                                  <span className={`font-num text-xs ${new Date(row.due_date) < new Date() ? 'text-danger font-semibold' : 'text-ink-muted'}`}>
+                                    {format(new Date(row.due_date), 'd MMM yyyy')}
+                                  </span>
+                                ) : (
+                                  <span className="text-ink-muted text-xs">-</span>
+                                )}
                               </td>
                               <td><span className="font-num">{fmt(row.amount)}</span></td>
-                              <td>
-                                {row.fine_amount > 0
-                                  ? <span className="font-num text-danger text-xs font-semibold">{fmt(row.fine_amount)}</span>
-                                  : <span className="text-ink-muted text-xs">—</span>}
-                              </td>
+                              {activeFilter === 'first_emi_charge_due' ? (
+                                <>
+                                  <td><span className="font-num">{fmt(row.first_emi_charge_paid || 0)}</span></td>
+                                  <td><span className="font-num text-danger text-xs font-semibold">{fmt(row.first_emi_charge_remaining || 0)}</span></td>
+                                </>
+                              ) : (
+                                <td>
+                                  {row.fine_amount > 0
+                                    ? <span className="font-num text-danger text-xs font-semibold">{fmt(row.fine_amount)}</span>
+                                    : <span className="text-ink-muted text-xs">—</span>}
+                                </td>
+                              )}
                             </tr>
                           ))}
                         </tbody>
