@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { Customer, Retailer } from '@/lib/types';
 import { createClient } from '@/lib/supabase/client';
 import toast from 'react-hot-toast';
+import { readJsonSafe } from '@/lib/formatters';
 
 interface CustomerFormModalProps {
   customer?: Customer | null;
@@ -45,10 +46,17 @@ const EMPTY = {
   lock_provider: '',
   lock_device_id: '',
   google_drive_docs: '',
+  status: 'RUNNING',
+  is_locked: 'false',
+  completion_remark: '',
+  completion_date: '',
+  settlement_amount: '',
+  settlement_date: '',
+  first_emi_charge_paid_at: '',
 };
 
 type FormData = typeof EMPTY;
-type TabKey = 'info' | 'finance' | 'images';
+type TabKey = 'info' | 'finance' | 'images' | 'admin';
 
 function isValidUrl(url: string) {
   if (!url) return true;
@@ -99,6 +107,13 @@ export default function CustomerFormModal({
         lock_provider: (customer as Record<string, unknown>).lock_provider as string || '',
         lock_device_id: (customer as Record<string, unknown>).lock_device_id as string || '',
         google_drive_docs: (customer as Record<string, unknown>).google_drive_docs as string || '',
+        status: customer.status || 'RUNNING',
+        is_locked: customer.is_locked ? 'true' : 'false',
+        completion_remark: customer.completion_remark || '',
+        completion_date: customer.completion_date || '',
+        settlement_amount: customer.settlement_amount ? String(customer.settlement_amount) : '',
+        settlement_date: customer.settlement_date || '',
+        first_emi_charge_paid_at: customer.first_emi_charge_paid_at || '',
       });
     }
   }, [customer]);
@@ -251,23 +266,39 @@ export default function CustomerFormModal({
       lock_provider: form.lock_provider || null,
       lock_device_id: form.lock_device_id.trim() || null,
       google_drive_docs: form.google_drive_docs.trim() || null,
+      status: form.status as Customer['status'],
+      is_locked: form.is_locked === 'true',
+      completion_remark: form.completion_remark.trim() || null,
+      completion_date: form.completion_date || null,
+      settlement_amount: form.settlement_amount ? parseFloat(form.settlement_amount) : null,
+      settlement_date: form.settlement_date || null,
+      first_emi_charge_paid_at: form.first_emi_charge_paid_at || null,
     };
 
     try {
-      let error;
       if (customer) {
-        ({ error } = await supabase.from('customers').update(payload).eq('id', customer.id));
+        const res = await fetch(`/api/admin/customers/${customer.id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+        const json = await readJsonSafe<{ ok?: boolean; error?: string; message?: string }>(res);
+        if (!res.ok || !json?.ok) {
+          toast.error(json?.error || 'Failed to update customer');
+          return;
+        }
+        toast.success(json.message || 'Customer updated successfully');
       } else {
-        ({ error } = await supabase.from('customers').insert(payload));
+        const { error } = await supabase.from('customers').insert(payload);
+        if (error) {
+          if (error.code === '23505') toast.error('This IMEI already exists in the system');
+          else toast.error(error.message);
+          return;
+        }
+        toast.success('Customer created successfully');
       }
-      if (error) {
-        if (error.code === '23505') toast.error('This IMEI already exists in the system');
-        else toast.error(error.message);
-      } else {
-        toast.success(customer ? 'Customer updated!' : 'Customer created!');
-        onSaved();
-        onClose();
-      }
+      onSaved();
+      onClose();
     } finally {
       setLoading(false);
     }
@@ -277,6 +308,7 @@ export default function CustomerFormModal({
     { key: 'info'    as TabKey, label: '👤 Personal & Device' },
     { key: 'finance' as TabKey, label: '💰 Finance & EMI' },
     { key: 'images'  as TabKey, label: '🖼️ Images (optional)' },
+    { key: 'admin'   as TabKey, label: '🛡️ Admin Controls' },
   ];
 
   // Count errors per tab for red dot indicator
@@ -557,6 +589,60 @@ export default function CustomerFormModal({
                 </div>
               </section>
             )}
+
+            {tab === 'admin' && (
+              <>
+                <section>
+                  <p className="form-section">Admin Notes / Status</p>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label className="label">Customer Status</label>
+                      <select value={form.status} onChange={e => set('status', e.target.value)} className="input">
+                        <option value="RUNNING">RUNNING</option>
+                        <option value="COMPLETE">COMPLETE</option>
+                        <option value="SETTLED">SETTLED</option>
+                        <option value="NPA">NPA</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="label">Lock State</label>
+                      <select value={form.is_locked} onChange={e => set('is_locked', e.target.value)} className="input">
+                        <option value="false">Unlocked</option>
+                        <option value="true">Locked</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="label">Completion Date</label>
+                      <input type="date" value={form.completion_date} onChange={e => set('completion_date', e.target.value)} className="input" />
+                    </div>
+                    <div>
+                      <label className="label">Settlement Date</label>
+                      <input type="date" value={form.settlement_date} onChange={e => set('settlement_date', e.target.value)} className="input" />
+                    </div>
+                    <F label="Settlement Amount (₹)" field="settlement_amount" form={form} set={set} errors={errors} type="number" placeholder="Optional" />
+                    <div>
+                      <label className="label">First EMI Charge Paid At</label>
+                      <input
+                        type="datetime-local"
+                        value={form.first_emi_charge_paid_at ? new Date(form.first_emi_charge_paid_at).toISOString().slice(0, 16) : ''}
+                        onChange={e => set('first_emi_charge_paid_at', e.target.value)}
+                        className="input"
+                      />
+                    </div>
+                  </div>
+                  <div className="mt-4">
+                    <label className="label">Admin Remark / Notes</label>
+                    <textarea
+                      value={form.completion_remark}
+                      onChange={e => set('completion_remark', e.target.value)}
+                      rows={4}
+                      placeholder="Internal remark, completion notes, or customer-specific notice"
+                      className="input"
+                    />
+                  </div>
+                </section>
+              </>
+            )}
           </div>
 
           {/* ── Footer ── */}
@@ -578,7 +664,7 @@ export default function CustomerFormModal({
                   />
                 ))}
                 <span className="text-xs text-ink-muted ml-2">
-                  {tab === 'info' ? 'Step 1 of 3' : tab === 'finance' ? 'Step 2 of 3' : 'Step 3 of 3'}
+                  {tab === 'info' ? 'Step 1 of 4' : tab === 'finance' ? 'Step 2 of 4' : tab === 'images' ? 'Step 3 of 4' : 'Step 4 of 4'}
                 </span>
               </div>
               <div className="flex gap-3">
@@ -588,16 +674,16 @@ export default function CustomerFormModal({
                 {tab !== 'info' && (
                   <button
                     type="button"
-                    onClick={() => setTab(tab === 'finance' ? 'info' : 'finance')}
+                    onClick={() => setTab(tab === 'finance' ? 'info' : tab === 'images' ? 'finance' : 'images')}
                     className="btn-secondary"
                   >
                     ← Back
                   </button>
                 )}
-                {tab !== 'images' && (
+                {tab !== 'admin' && (
                   <button
                     type="button"
-                    onClick={() => setTab(tab === 'info' ? 'finance' : 'images')}
+                    onClick={() => setTab(tab === 'info' ? 'finance' : tab === 'finance' ? 'images' : 'admin')}
                     className="btn-ghost border border-surface-4"
                   >
                     Next →
