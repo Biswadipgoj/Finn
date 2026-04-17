@@ -1088,13 +1088,6 @@ export default function AdminDashboard() {
                   >
                     📥 Download CSV
                   </a>
-                  <a
-                    href={`/api/report/monthly?month=${reportMonth}&year=${reportYear}&format=xlsx`}
-                    download
-                    className="btn-secondary"
-                  >
-                    📊 Download XLSX
-                  </a>
                   <button onClick={downloadGroupedMonthlyCsv} className="btn-secondary">
                     📥 Download Grouped CSV
                   </button>
