@@ -740,22 +740,16 @@ export default function CustomerPortal() {
                 )}
               </div>
               {dueSummary.nextDueDate && <p className="text-xs text-slate-500 mt-3">Due: {format(new Date(dueSummary.nextDueDate), 'd MMM yyyy')}</p>}
-              <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-2">
+              <div className="mt-4">
                 <button
                   onClick={handleOnlinePay}
                   disabled={payableNow.totalDue <= 0}
-                  className="btn-primary py-3 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="btn-primary w-full py-3 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   Pay Online via UPI
                 </button>
-                <button
-                  onClick={() => shareOnWhatsapp(payableNow.totalDue)}
-                  className="btn-ghost py-3"
-                >
-                  Share Details on WhatsApp
-                </button>
               </div>
-              <p className="text-xs text-slate-600 mt-2">UPI note & reference auto-include IMEI. After UPI return, WhatsApp share opens for number 7003617029.</p>
+              <p className="text-xs text-slate-600 mt-2">UPI note & reference auto-include IMEI for easy payment tracking.</p>
             </div>
           ) : null;
         })()}
