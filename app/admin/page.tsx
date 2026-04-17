@@ -623,42 +623,6 @@ export default function AdminDashboard() {
     return acc;
   }, {});
 
-  function downloadGroupedMonthlyCsv() {
-    if (!monthlyCollectionRows.length) {
-      toast.error('No monthly collection rows to export');
-      return;
-    }
-    const lines: string[] = [];
-    for (const [groupKey, rows] of Object.entries(groupedMonthlyRows)) {
-      const retailerName = groupKey.split('::')[1] || 'Unknown Retailer';
-      lines.push(`RETAILER: ${retailerName}`);
-      lines.push('Payment Date (IST),Customer Name,Mobile,EMI Paid,Fine Paid,Total Paid,Payment Mode,UTR,Status');
-      for (const row of rows) {
-        lines.push([
-          formatIstDateTime(row.paymentDate),
-          row.customerName,
-          row.mobile,
-          row.emiPaid,
-          row.finePaid,
-          row.totalPaid,
-          row.paymentMode,
-          row.utr === '-' ? '' : row.utr,
-          row.status,
-        ].map((cell) => JSON.stringify(cell ?? '')).join(','));
-      }
-      lines.push('');
-    }
-    const blob = new Blob([lines.join('\n')], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    const monthTag = `${String(reportMonth).padStart(2, '0')}-${reportYear}`;
-    a.href = url;
-    a.download = `monthly_collection_grouped_${monthTag}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
-    toast.success('Downloaded grouped Monthly Collection CSV');
-  }
-
   return (
     <div className="min-h-screen page-bg">
       <NavBar role="admin" userName="TELEPOINT" pendingCount={pendingCount} />
@@ -1062,44 +1026,9 @@ export default function AdminDashboard() {
 
             {/* Excel Exports */}
             <div className="card p-6">
-              {/* Monthly Collection Sheet — retailer-wise CSV */}
-              <div className="card p-5 mb-6">
-                <p className="section-header">📋 Monthly Collection Sheet</p>
-                <p className="text-xs text-ink-muted mb-4">Download retailer-wise EMI collection sheet (same format as your existing CSV)</p>
-                <div className="flex flex-wrap items-end gap-3">
-                  <div>
-                    <label className="label">Month</label>
-                    <select value={reportMonth} onChange={e => setReportMonth(Number(e.target.value))} className="input w-36">
-                      {['January','February','March','April','May','June','July','August','September','October','November','December'].map((m,i) => (
-                        <option key={i} value={i+1}>{m}</option>
-                      ))}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="label">Year</label>
-                    <select value={reportYear} onChange={e => setReportYear(Number(e.target.value))} className="input w-28">
-                      {[2024,2025,2026,2027].map(y => <option key={y} value={y}>{y}</option>)}
-                    </select>
-                  </div>
-                  <a
-                    href={'/api/report/monthly?month=' + reportMonth + '&year=' + reportYear}
-                    download
-                    className="btn-primary"
-                  >
-                    📥 Download CSV
-                  </a>
-                  <button onClick={downloadGroupedMonthlyCsv} className="btn-secondary">
-                    📥 Download Grouped CSV
-                  </button>
-                  <button onClick={() => window.print()} className="btn-secondary no-print">
-                    🖨️ Print Grouped View
-                  </button>
-                </div>
-
-                <div className="mt-5 rounded-xl border border-surface-4 overflow-hidden">
+              <div className="rounded-xl border border-surface-4 overflow-hidden mb-6">
                   <div className="px-4 py-3 border-b border-surface-4 bg-surface-2">
                     <p className="text-sm font-semibold text-ink">Monthly Collection (Grouped by Retailer)</p>
-                    <p className="text-xs text-ink-muted mt-1">Retailer headers are centered and color-coded for quick scanning.</p>
                   </div>
                   {monthlyCollectionLoading ? (
                     <div className="px-4 py-6 text-sm text-ink-muted">Loading monthly collections…</div>
@@ -1193,7 +1122,6 @@ export default function AdminDashboard() {
                       </div>
                     </>
                   )}
-                </div>
               </div>
 
               {/* Report Downloads */}
