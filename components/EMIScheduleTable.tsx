@@ -133,6 +133,8 @@ export default function EMIScheduleTable({ emis, isAdmin, nextUnpaidNo, onRefres
       setEditingId(null);
       setEditForm(null);
       onRefresh?.();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Failed to update EMI');
     } finally {
       setSaving(false);
     }
@@ -231,9 +233,11 @@ export default function EMIScheduleTable({ emis, isAdmin, nextUnpaidNo, onRefres
                     </select>
 
                     <input type="text" value={editForm.utr} onChange={e => setField('utr', e.target.value)} className="input py-2 text-sm" placeholder="UTR / Reference" />
+                    <input type="number" value={Math.max(0, Number(editForm.amount || 0) - Number(editForm.partial_paid_amount || 0))} readOnly className="input py-2 text-sm bg-surface-2" placeholder="Remaining EMI" />
                     <input type="number" value={editForm.fine_amount} onChange={e => setField('fine_amount', e.target.value)} className="input py-2 text-sm" placeholder="Fine Amount" />
                     <input type="number" value={editForm.fine_paid_amount} onChange={e => setField('fine_paid_amount', e.target.value)} className="input py-2 text-sm" placeholder="Fine Paid" />
                     <input type="datetime-local" value={editForm.fine_paid_at} onChange={e => setField('fine_paid_at', e.target.value)} className="input py-2 text-sm" />
+                    <input type="number" value={Math.max(0, Number(editForm.fine_amount || 0) - Number(editForm.fine_paid_amount || 0))} readOnly className="input py-2 text-sm bg-surface-2" placeholder="Remaining Fine" />
 
                     <select value={editForm.collected_by_role} onChange={e => setField('collected_by_role', e.target.value as EditForm['collected_by_role'])} className="input py-2 text-sm">
                       <option value="">Collected by role</option>
