@@ -7,6 +7,7 @@ import toast from 'react-hot-toast';
 import Link from 'next/link';
 import PhoneLockBadge from './PhoneLockBadge';
 import CustomerAppDownload from './CustomerAppDownload';
+import { formatCurrency, formatText } from '@/lib/formatters';
 
 interface Props {
   customer: Customer;
@@ -15,9 +16,7 @@ interface Props {
   isAdmin?: boolean;
 }
 
-function fmt(n: number) {
-  return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', minimumFractionDigits: 0 }).format(n);
-}
+const fmt = formatCurrency;
 
 export default function CustomerDetailPanel({ customer, paidCount, totalEmis, isAdmin }: Props) {
   const [copiedNum, setCopiedNum] = useState<string | null>(null);
@@ -218,7 +217,7 @@ export default function CustomerDetailPanel({ customer, paidCount, totalEmis, is
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-px bg-surface-4">
         {[
           { l: 'IMEI', v: customer.imei, mono: true, small: true },
-          { l: 'Model', v: customer.model_no },
+          { l: 'Model', v: formatText(customer.model_no) },
           { l: 'Box No.', v: customer.box_no },
           { l: 'Retailer', v: retailer?.name },
           ...(retailer?.mobile ? [{ l: 'Retailer Mobile', v: retailer.mobile, mono: true }] : []),
@@ -228,7 +227,7 @@ export default function CustomerDetailPanel({ customer, paidCount, totalEmis, is
           { l: 'EMI Amount', v: fmt(customer.emi_amount), mono: true, accent: true },
           { l: 'Tenure', v: `${customer.emi_tenure} months`, mono: true },
           { l: 'EMI Due Day', v: `${customer.emi_due_day}th` },
-          ...(customer.aadhaar ? [{ l: 'Aadhaar', v: `XXXX ${customer.aadhaar.slice(-4)}`, mono: true }] : []),
+          ...(customer.aadhaar ? [{ l: 'Aadhaar', v: customer.aadhaar, mono: true }] : []),
           ...(customer.voter_id ? [{ l: 'Voter ID', v: customer.voter_id }] : []),
           ...(customer.address ? [{ l: 'Address', v: `${customer.address}${customer.landmark ? `, ${customer.landmark}` : ''}` }] : []),
         ].filter(x => x.v).map(({ l, v, mono, small, accent }) => (

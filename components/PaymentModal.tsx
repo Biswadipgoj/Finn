@@ -13,8 +13,8 @@ const fmt = formatCurrency;
 
 export default function PaymentModal({ customer, emis, breakdown, onClose, onSubmitted, isAdmin }: Props) {
   const unpaidEmis = emis.filter(e => e.status === 'UNPAID' || e.status === 'PARTIALLY_PAID');
-  const defaultEmiNo = breakdown?.next_emi_no ?? unpaidEmis[0]?.emi_no ?? 0;
-  const [selectedEmiNo, setSelectedEmiNo] = useState(defaultEmiNo);
+  const defaultEmiNo = breakdown?.next_emi_no ?? unpaidEmis[0]?.emi_no ?? null;
+  const [selectedEmiNo, setSelectedEmiNo] = useState<number | null>(defaultEmiNo);
   const [mode, setMode] = useState<'CASH' | 'UPI'>('CASH');
   const [utr, setUtr] = useState('');
   const [retailerPin, setRetailerPin] = useState('');
@@ -52,14 +52,14 @@ export default function PaymentModal({ customer, emis, breakdown, onClose, onSub
 
   // Auto-tick what's due when fine/charge changes
   useEffect(() => { setCollectFine(scheduledFine > 0); setCollectCharge(scheduledCharge > 0); }, [scheduledFine, scheduledCharge]);
-  useEffect(() => { if (selectedEmiNo === 0 && unpaidEmis.length > 0) setSelectedEmiNo(unpaidEmis[0].emi_no); }, [selectedEmiNo, unpaidEmis]);
+  useEffect(() => { if (selectedEmiNo == null && unpaidEmis.length > 0) setSelectedEmiNo(unpaidEmis[0].emi_no); }, [selectedEmiNo, unpaidEmis]);
   useEffect(() => { setEditEmi(''); setEditFine(''); setEditCharge(''); }, [selectedEmiNo]);
 
   // QR
   useEffect(() => {
     if (mode === 'UPI' && total > 0) {
       import('qrcode').then(QR => {
-        QR.toDataURL(`upi://pay?pa=${UPI_ID}&pn=TelePoint&am=${total}&tn=EMI${selectedEmiNo}_${customer.imei.slice(-6)}&cu=INR`, { width: 240, margin: 2, color: { dark: '#1e293b', light: '#ffffff' } }).then(setQrDataUrl);
+        QR.toDataURL(`upi://pay?pa=${UPI_ID}&pn=TelePoint&am=${total}&tn=EMI${selectedEmiNo ?? 'X'}_${customer.imei.slice(-6)}&cu=INR`, { width: 240, margin: 2, color: { dark: '#1e293b', light: '#ffffff' } }).then(setQrDataUrl);
       }).catch(() => {});
     } else setQrDataUrl('');
   }, [mode, total, selectedEmiNo, customer.imei]);
@@ -93,7 +93,7 @@ export default function PaymentModal({ customer, emis, breakdown, onClose, onSub
           total_emi_amount: emiAmt, scheduled_emi_amount: scheduledEmiAmount,
           fine_amount: fineAmt, first_emi_charge_amount: chargeAmt,
           total_amount: total,
-          fine_for_emi_no: fineAmt > 0 ? selectedEmiNo : undefined,
+          fine_for_emi_no: fineAmt > 0 ? (selectedEmiNo ?? undefined) : undefined,
           fine_due_date: fineAmt > 0 && selectedEmi ? selectedEmi.due_date : undefined,
           collected_by_role: isAdmin ? 'admin' : 'retailer',
           collect_type: getCollectType(),
@@ -120,13 +120,13 @@ export default function PaymentModal({ customer, emis, breakdown, onClose, onSub
             <div className="card bg-surface-2 p-4 space-y-2">
               <div className="flex justify-between text-sm"><span className="text-ink-muted">Customer</span><span className="font-semibold text-ink">{customer.customer_name}</span></div>
               <div className="flex justify-between text-sm"><span className="text-ink-muted">IMEI</span><span className="num text-ink">{customer.imei}</span></div>
-              {emiAmt > 0 && <div className="flex justify-between text-sm"><span className="text-ink-muted">EMI #{selectedEmiNo}</span><span className="num font-semibold">{fmt(emiAmt)}</span></div>}
+              {emiAmt > 0 && <div className="flex justify-between text-sm"><span className="text-ink-muted">EMI {selectedEmiNo ? `#${selectedEmiNo}` : ''}</span><span className="num font-semibold">{fmt(emiAmt)}</span></div>}
               {chargeAmt > 0 && <div className="flex justify-between text-sm"><span className="text-warning">1st Charge</span><span className="num text-warning">{fmt(chargeAmt)}</span></div>}
               {fineAmt > 0 && <div className="flex justify-between text-sm"><span className="text-danger">Fine</span><span className="num text-danger">{fmt(fineAmt)}</span></div>}
               <div className="h-px bg-surface-4" />
               <div className="flex justify-between"><span className="font-bold">Total</span><span className="num text-xl font-bold text-brand-600">{fmt(total)}</span></div>
             </div>
-            <button onClick={() => { const m = [`🧾 *TelePoint EMI Receipt*`,'',`👤 ${customer.customer_name}`,`📱 ${customer.mobile}`,`🔢 IMEI: ${customer.imei}`,'',emiAmt>0?`💳 EMI #${selectedEmiNo}: ${fmt(emiAmt)}`:'',chargeAmt>0?`⭐ Charge: ${fmt(chargeAmt)}`:'',fineAmt>0?`⚠️ Fine: ${fmt(fineAmt)}`:'',`💰 *Total: ${fmt(total)}*`,`🏷️ ${mode}`,`📅 ${format(now,'d MMM yyyy, h:mm a')}`,'','— TelePoint'].filter(Boolean).join('\n'); window.open(`https://wa.me/?text=${encodeURIComponent(m)}`,'_blank'); }} className="btn w-full py-3 bg-green-500 hover:bg-green-600 text-white">📤 Share WhatsApp</button>
+            <button onClick={() => { const m = [`🧾 *TelePoint EMI Receipt*`,'',`👤 ${customer.customer_name}`,`📱 ${customer.mobile}`,`🔢 IMEI: ${customer.imei}`,'',emiAmt>0?`💳 EMI ${selectedEmiNo ? `#${selectedEmiNo}` : ''}: ${fmt(emiAmt)}`:'',chargeAmt>0?`⭐ Charge: ${fmt(chargeAmt)}`:'',fineAmt>0?`⚠️ Fine: ${fmt(fineAmt)}`:'',`💰 *Total: ${fmt(total)}*`,`🏷️ ${mode}`,`📅 ${format(now,'d MMM yyyy, h:mm a')}`,'','— TelePoint'].filter(Boolean).join('\n'); window.open(`https://wa.me/?text=${encodeURIComponent(m)}`,'_blank'); }} className="btn w-full py-3 bg-green-500 hover:bg-green-600 text-white">📤 Share WhatsApp</button>
             <button onClick={() => { onSubmitted(); onClose(); }} className="btn-ghost w-full py-2.5">Close</button>
           </div>
         </div>
@@ -150,7 +150,7 @@ export default function PaymentModal({ customer, emis, breakdown, onClose, onSub
             <label className={`flex items-center justify-between p-3 rounded-xl border-2 cursor-pointer transition-all ${collectEmi ? 'border-brand-400 bg-brand-50' : 'border-surface-4'}`}>
               <div className="flex items-center gap-3">
                 <input type="checkbox" checked={collectEmi} onChange={e => setCollectEmi(e.target.checked)} className="w-5 h-5 accent-brand-500 rounded" />
-                <div><p className="text-sm font-semibold text-ink">💳 EMI #{selectedEmiNo || '—'}</p><p className="text-xs text-ink-muted">Due: {fmt(scheduledEmiAmount)}{selectedEmi && Number(selectedEmi.partial_paid_amount || 0) > 0 ? ` · Paid ${fmt(selectedEmi.partial_paid_amount || 0)}` : ''}</p></div>
+                <div><p className="text-sm font-semibold text-ink">💳 EMI {selectedEmiNo ? `#${selectedEmiNo}` : 'selection'}</p><p className="text-xs text-ink-muted">Due: {fmt(scheduledEmiAmount)}{selectedEmi && Number(selectedEmi.partial_paid_amount || 0) > 0 ? ` · Paid ${fmt(selectedEmi.partial_paid_amount || 0)}` : ''}</p></div>
               </div>
               <span className="num font-semibold text-ink">{fmt(scheduledEmiAmount)}</span>
             </label>

@@ -3,10 +3,9 @@ import { createClient } from '@/lib/supabase/server';
 import { format } from 'date-fns';
 import { notFound, redirect } from 'next/navigation';
 import PrintButton from '@/components/PrintButton';
+import { formatCurrency } from '@/lib/formatters';
 
-function fmt(n: number) {
-  return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', minimumFractionDigits: 0 }).format(n);
-}
+const fmt = formatCurrency;
 
 export default async function NOCPage({ params, searchParams }: {
   params: { id: string };
@@ -103,7 +102,7 @@ export default async function NOCPage({ params, searchParams }: {
               <DocRow label="Name" value={customer.customer_name} bold />
               {customer.father_name && <DocRow label="Father / C/O" value={customer.father_name} />}
               <DocRow label="Mobile" value={customer.mobile} />
-              {customer.aadhaar && <DocRow label="Aadhaar" value={`XXXX-XXXX-${customer.aadhaar.slice(-4)}`} />}
+              {customer.aadhaar && <DocRow label="Aadhaar" value={customer.aadhaar} />}
               {customer.voter_id && <DocRow label="Voter ID" value={customer.voter_id} />}
               {customer.address && <DocRow label="Address" value={`${customer.address}${customer.landmark ? `, near ${customer.landmark}` : ''}`} />}
             </DocSection>

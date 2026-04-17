@@ -9,15 +9,15 @@ import CustomerDetailPanel from '@/components/CustomerDetailPanel';
 import EMIScheduleTable from '@/components/EMIScheduleTable';
 import DueBreakdownPanel from '@/components/DueBreakdownPanel';
 import PaymentModal from '@/components/PaymentModal';
+import PaymentSummaryCard from '@/components/PaymentSummaryCard';
 import toast from 'react-hot-toast';
 import { format, differenceInDays } from 'date-fns';
 import Link from 'next/link';
 import { calculateTotalFineFromEmis } from '@/lib/fineCalc';
 import BottomNav from '@/components/BottomNav';
+import { formatCurrency } from '@/lib/formatters';
 
-function fmt(n: number) {
-  return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', minimumFractionDigits: 0 }).format(n);
-}
+const fmt = formatCurrency;
 
 export default function RetailerDashboard() {
   const supabase = createClient();
@@ -382,6 +382,7 @@ export default function RetailerDashboard() {
             )}
 
             <CustomerDetailPanel customer={selectedCustomer} paidCount={paidCount} totalEmis={selectedCustomer.emi_tenure} />
+            <PaymentSummaryCard customer={selectedCustomer} emis={customerEmis} breakdown={breakdown} />
 
             {breakdown && (() => {
               const daysLeft = breakdown.next_emi_due_date ? differenceInDays(new Date(breakdown.next_emi_due_date), new Date()) : null;
@@ -416,16 +417,19 @@ export default function RetailerDashboard() {
             {/* Collect payment button */}
             {selectedCustomer.status === 'RUNNING' ? (() => {
               const hasUnpaidEmis = customerEmis.some(e => e.status === 'UNPAID' || e.status === 'PARTIALLY_PAID');
+              const collectLabel = !hasUnpaidEmis
+                ? '✓ All EMIs Paid'
+                : breakdown?.next_emi_no
+                  ? `💳 Collect EMI #${breakdown.next_emi_no}`
+                  : '💳 Collect Payment';
               return (
-                <div className="flex justify-end">
+                <div className="sticky bottom-[4.75rem] sm:bottom-0 z-30">
                   <button
                     onClick={() => setShowPaymentModal(true)}
                     disabled={!hasUnpaidEmis}
-                    className="btn-primary text-base px-8 py-3.5"
+                    className="btn-primary w-full sm:w-auto text-base px-8 py-3.5 shadow-lg"
                   >
-                    {!hasUnpaidEmis
-                      ? '✓ All EMIs Paid'
-                      : `💳 Collect EMI #${breakdown?.next_emi_no ?? ''}`}
+                    {collectLabel}
                   </button>
                 </div>
               );

@@ -1,30 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServiceClient } from '@/lib/supabase/server';
+import { formatCurrency, formatDateOnly, formatDateTime } from '@/lib/formatters';
 
-function fmt(n: number) {
-  return new Intl.NumberFormat('en-IN', {
-    style: 'currency',
-    currency: 'INR',
-    minimumFractionDigits: 0,
-  }).format(n);
-}
+const fmt = formatCurrency;
 
 function fmtDate(d: string) {
-  return new Date(d).toLocaleDateString('en-IN', {
-    day: 'numeric',
-    month: 'short',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
+  return formatDateTime(d);
 }
 
 function fmtDateShort(d: string) {
-  return new Date(d).toLocaleDateString('en-IN', {
-    day: 'numeric',
-    month: 'short',
-    year: 'numeric',
-  });
+  return formatDateOnly(d);
 }
 
 export async function GET(
@@ -211,5 +196,4 @@ export async function GET(
     },
   });
 }
-
 

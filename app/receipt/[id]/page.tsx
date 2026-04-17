@@ -3,10 +3,9 @@ import { createServiceClient } from '@/lib/supabase/server';
 import { format } from 'date-fns';
 import { notFound } from 'next/navigation';
 import PrintButton from '@/components/PrintButton';
+import { formatCurrency } from '@/lib/formatters';
 
-function fmt(n: number) {
-  return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', minimumFractionDigits: 0 }).format(n);
-}
+const fmt = formatCurrency;
 
 type Status = 'PENDING' | 'APPROVED' | 'REJECTED';
 

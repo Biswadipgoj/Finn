@@ -2,10 +2,8 @@
 
 import { DueBreakdown } from '@/lib/types';
 import { format, addDays, differenceInDays } from 'date-fns';
-
-function fmt(n: number) {
-  return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', minimumFractionDigits: 0 }).format(n);
-}
+import { formatCurrency } from '@/lib/formatters';
+const fmt = formatCurrency;
 
 export default function DueBreakdownPanel({ breakdown }: { breakdown: DueBreakdown }) {
   if (!breakdown || !breakdown.next_emi_no) return null;

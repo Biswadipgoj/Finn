@@ -20,6 +20,17 @@ export function formatDateOnly(value?: string | null): string {
   return d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
 }
 
+export function formatText(value: unknown, fallback = '-'): string {
+  if (typeof value !== 'string') return fallback;
+  const clean = value.trim();
+  return clean ? clean : fallback;
+}
+
+export function formatPlainNumber(value: unknown, fallback = 0): string {
+  const num = toNumber(value, fallback);
+  return new Intl.NumberFormat('en-IN', { maximumFractionDigits: 0 }).format(num);
+}
+
 export function formatDateTime(value?: string | null): string {
   if (!value) return '-';
   const d = new Date(value);

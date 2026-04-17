@@ -1,7 +1,8 @@
 'use client';
 import { useState, useEffect } from 'react';
+import { formatCurrency } from '@/lib/formatters';
 
-function fmt(n: number) { return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', minimumFractionDigits: 0 }).format(n); }
+const fmt = formatCurrency;
 
 export default function SmartAlertPopup({ fineDue, daysUntilDue, nextEmiNo, nextEmiAmount, firstChargeDue }: {
   fineDue: number; daysUntilDue: number | null; nextEmiNo?: number; nextEmiAmount?: number; firstChargeDue: number;

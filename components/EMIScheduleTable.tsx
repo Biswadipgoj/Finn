@@ -184,21 +184,28 @@ export default function EMIScheduleTable({ emis, isAdmin, nextUnpaidNo, onRefres
           const emiPaidAmount = Math.max(0, Number(emi.partial_paid_amount || 0));
           const emiRemaining = Math.max(0, Number(emi.amount || 0) - emiPaidAmount);
           const fineRemaining = Math.max(0, displayFine - Number(emi.fine_paid_amount || 0));
+          const hasFine = displayFine > 0;
           return (
             <div key={emi.id} className={`p-4 space-y-2 ${isOverdue ? 'bg-danger-light/40' : isNext ? 'bg-brand-50/50' : ''}`}>
               <div className="flex items-center justify-between">
-                <p className="font-semibold text-ink">EMI #{emi.emi_no}</p>
+                <div>
+                  <p className="font-semibold text-ink">EMI #{emi.emi_no}</p>
+                  <p className={`text-[11px] ${isOverdue ? 'text-danger' : 'text-ink-muted'}`}>{format(dueDate, 'd MMM yyyy')}</p>
+                </div>
                 {emi.status === 'APPROVED' && <span className="badge-blue">✓ Paid</span>}
                 {emi.status === 'PARTIALLY_PAID' && <span className="badge-yellow">Partial</span>}
                 {emi.status === 'PENDING_APPROVAL' && <span className="badge-yellow">⏳ Pending</span>}
                 {emi.status === 'UNPAID' && <span className={`badge ${isOverdue ? 'badge-red' : 'badge-gray'}`}>{isOverdue ? 'Overdue' : 'Unpaid'}</span>}
               </div>
               <div className="grid grid-cols-2 gap-2 text-xs">
-                <p className="text-ink-muted">Due Date</p><p className="text-right num">{format(dueDate, 'd MMM yyyy')}</p>
                 <p className="text-ink-muted">Amount</p><p className="text-right num">{fmt(emi.amount)}</p>
                 {emi.status === 'PARTIALLY_PAID' && <><p className="text-ink-muted">EMI Paid</p><p className="text-right num text-success">{fmt(emiPaidAmount)}</p><p className="text-ink-muted">EMI Remaining</p><p className="text-right num text-warning">{fmt(emiRemaining)}</p></>}
-                <p className="text-ink-muted">Fine</p><p className="text-right num">{displayFine > 0 ? fmt(fineRemaining > 0 ? fineRemaining : displayFine) : '—'}</p>
-                <p className="text-ink-muted">Fine Status</p><p className="text-right">{Number(emi.fine_paid_amount || 0) > 0 && fineRemaining > 0 ? 'Partially paid' : fineRemaining === 0 && displayFine > 0 ? 'Paid' : displayFine > 0 ? 'Due' : '—'}</p>
+                {hasFine && (
+                  <>
+                    <p className="text-ink-muted">Fine</p><p className="text-right num">{fmt(fineRemaining > 0 ? fineRemaining : displayFine)}</p>
+                    <p className="text-ink-muted">Fine Status</p><p className="text-right">{Number(emi.fine_paid_amount || 0) > 0 && fineRemaining > 0 ? 'Partially paid' : fineRemaining === 0 ? 'Paid' : 'Due'}</p>
+                  </>
+                )}
                 <p className="text-ink-muted">Paid On</p><p className="text-right num">{emi.paid_at ? format(new Date(emi.paid_at), 'd MMM yy') : emi.partial_paid_at ? `${format(new Date(emi.partial_paid_at), 'd MMM yy')} (partial)` : '—'}</p>
               </div>
             </div>
