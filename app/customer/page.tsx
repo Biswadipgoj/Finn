@@ -46,7 +46,6 @@ export default function CustomerPortal() {
   const [isLaunchingUpi, setIsLaunchingUpi] = useState(false);
   const [pendingWhatsappShare, setPendingWhatsappShare] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const upiReturnHandledRef = useRef(false);
 
   // Restore session from localStorage OR auto-login via token
   useEffect(() => {
@@ -389,44 +388,21 @@ export default function CustomerPortal() {
     const note = `EMI ${payableNow.emiNo || ''} ${customer.customer_name} (${reference})`;
     const upiUrl = `upi://pay?pa=7003617029@upi&pn=TelePoint&am=${amount}&cu=INR&tn=${encodeURIComponent(note)}&tr=${encodeURIComponent(reference)}`;
     toast.success('Opening UPI app with exact payable amount. After payment, WhatsApp share will open.');
-    upiReturnHandledRef.current = false;
     setPendingWhatsappShare(true);
     setIsLaunchingUpi(true);
     window.location.href = upiUrl;
   }
 
   useEffect(() => {
-    if (!pendingWhatsappShare || !isLaunchingUpi) return;
-
-    function triggerWhatsappShare() {
-      if (upiReturnHandledRef.current) return;
-      if (document.visibilityState !== 'visible') return;
-      upiReturnHandledRef.current = true;
-      setIsLaunchingUpi(false);
-      setPendingWhatsappShare(false);
-      setTimeout(() => {
+    function onVisible() {
+      if (document.visibilityState === 'visible' && pendingWhatsappShare && isLaunchingUpi) {
+        setIsLaunchingUpi(false);
+        setPendingWhatsappShare(false);
         shareOnWhatsapp(payableNow.totalDue);
-      }, 250);
+      }
     }
-
-    const onVisibility = () => triggerWhatsappShare();
-    const onFocus = () => triggerWhatsappShare();
-    const onPageShow = () => triggerWhatsappShare();
-
-    document.addEventListener('visibilitychange', onVisibility);
-    window.addEventListener('focus', onFocus);
-    window.addEventListener('pageshow', onPageShow);
-
-    const fallbackTimer = window.setTimeout(() => {
-      triggerWhatsappShare();
-    }, 45000);
-
-    return () => {
-      document.removeEventListener('visibilitychange', onVisibility);
-      window.removeEventListener('focus', onFocus);
-      window.removeEventListener('pageshow', onPageShow);
-      window.clearTimeout(fallbackTimer);
-    };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => document.removeEventListener('visibilitychange', onVisible);
   }, [pendingWhatsappShare, isLaunchingUpi, payableNow.totalDue]);
 
   if (!session) {
@@ -764,15 +740,22 @@ export default function CustomerPortal() {
                 )}
               </div>
               {dueSummary.nextDueDate && <p className="text-xs text-slate-500 mt-3">Due: {format(new Date(dueSummary.nextDueDate), 'd MMM yyyy')}</p>}
-              <div className="mt-4">
+              <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-2">
                 <button
                   onClick={handleOnlinePay}
                   disabled={payableNow.totalDue <= 0}
-                  className="btn-primary w-full py-3 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="btn-primary py-3 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   Pay Online via UPI
                 </button>
+                <button
+                  onClick={() => shareOnWhatsapp(payableNow.totalDue)}
+                  className="btn-ghost py-3"
+                >
+                  Share Details on WhatsApp
+                </button>
               </div>
+              <p className="text-xs text-slate-600 mt-2">UPI note & reference auto-include IMEI. After UPI return, WhatsApp share opens for number 7003617029.</p>
             </div>
           ) : null;
         })()}
