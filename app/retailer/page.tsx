@@ -416,16 +416,19 @@ export default function RetailerDashboard() {
             {/* Collect payment button */}
             {selectedCustomer.status === 'RUNNING' ? (() => {
               const hasUnpaidEmis = customerEmis.some(e => e.status === 'UNPAID' || e.status === 'PARTIALLY_PAID');
+              const collectLabel = !hasUnpaidEmis
+                ? '✓ All EMIs Paid'
+                : breakdown?.next_emi_no
+                  ? `💳 Collect EMI #${breakdown.next_emi_no}`
+                  : '💳 Collect Payment';
               return (
-                <div className="flex justify-end">
+                <div className="sticky bottom-[4.75rem] sm:bottom-0 z-30">
                   <button
                     onClick={() => setShowPaymentModal(true)}
                     disabled={!hasUnpaidEmis}
-                    className="btn-primary text-base px-8 py-3.5"
+                    className="btn-primary w-full sm:w-auto text-base px-8 py-3.5 shadow-lg"
                   >
-                    {!hasUnpaidEmis
-                      ? '✓ All EMIs Paid'
-                      : `💳 Collect EMI #${breakdown?.next_emi_no ?? ''}`}
+                    {collectLabel}
                   </button>
                 </div>
               );
