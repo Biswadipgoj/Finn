@@ -262,8 +262,25 @@ export default function AdminDashboard() {
   // Always keep ref in sync with latest function
   selectCustomerRef.current = selectCustomerFn;
 
+  async function fetchCustomerById(customerId: string) {
+    const sb = supabaseRef.current;
+    const { data, error } = await sb
+      .from('customers')
+      .select('*, retailer:retailers(*)')
+      .eq('id', customerId)
+      .single();
+    if (error) throw error;
+    return data as Customer;
+  }
+
   async function refreshSelectedCustomer() {
-    if (selectedCustomer) await selectCustomerFn(selectedCustomer);
+    if (!selectedCustomer) return;
+    try {
+      const latest = await fetchCustomerById(selectedCustomer.id);
+      await selectCustomerFn(latest);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Failed to refresh customer');
+    }
   }
 
   async function handleMarkComplete() {
@@ -634,7 +651,10 @@ export default function AdminDashboard() {
                   </div>
                 </div>
 
-                <CustomerDetailPanel customer={selectedCustomer} paidCount={paidCount} totalEmis={selectedCustomer.emi_tenure} isAdmin={true} />
+                <section className="space-y-3">
+                  <h3 className="text-sm font-semibold uppercase tracking-wide text-ink-muted">Customer Details</h3>
+                  <CustomerDetailPanel customer={selectedCustomer} paidCount={paidCount} totalEmis={selectedCustomer.emi_tenure} isAdmin={true} />
+                </section>
                 {breakdown && (() => {
                   const daysLeft = breakdown.next_emi_due_date ? differenceInDays(new Date(breakdown.next_emi_due_date), new Date()) : null;
                   return (
@@ -662,15 +682,26 @@ export default function AdminDashboard() {
                     </div>
                   );
                 })()}
-                {breakdown && <DueBreakdownPanel breakdown={breakdown} />}
-                <EMIScheduleTable
-                  emis={customerEmis}
-                  nextUnpaidNo={breakdown?.next_emi_no ?? undefined}
-                  isAdmin={true}
-                  onRefresh={refreshSelectedCustomer}
-                  defaultFineAmount={fineSettings.default_fine_amount}
-                />
-                <PaymentSummaryCard customer={selectedCustomer} emis={customerEmis} breakdown={breakdown} />
+                {breakdown && (
+                  <section className="space-y-3">
+                    <h3 className="text-sm font-semibold uppercase tracking-wide text-ink-muted">Loan & EMI Plan</h3>
+                    <DueBreakdownPanel breakdown={breakdown} />
+                  </section>
+                )}
+                <section className="space-y-3">
+                  <h3 className="text-sm font-semibold uppercase tracking-wide text-ink-muted">EMI Schedule</h3>
+                  <EMIScheduleTable
+                    emis={customerEmis}
+                    nextUnpaidNo={breakdown?.next_emi_no ?? undefined}
+                    isAdmin={true}
+                    onRefresh={refreshSelectedCustomer}
+                    defaultFineAmount={fineSettings.default_fine_amount}
+                  />
+                </section>
+                <section className="space-y-3">
+                  <h3 className="text-sm font-semibold uppercase tracking-wide text-ink-muted">Fine & Payment Details</h3>
+                  <PaymentSummaryCard customer={selectedCustomer} emis={customerEmis} breakdown={breakdown} />
+                </section>
               </div>
             )}
           </div>

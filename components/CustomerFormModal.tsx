@@ -299,6 +299,8 @@ export default function CustomerFormModal({
       }
       onSaved();
       onClose();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Failed to save customer');
     } finally {
       setLoading(false);
     }

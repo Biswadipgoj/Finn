@@ -133,6 +133,8 @@ export default function EMIScheduleTable({ emis, isAdmin, nextUnpaidNo, onRefres
       setEditingId(null);
       setEditForm(null);
       onRefresh?.();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Failed to update EMI');
     } finally {
       setSaving(false);
     }
@@ -210,7 +212,13 @@ export default function EMIScheduleTable({ emis, isAdmin, nextUnpaidNo, onRefres
 
               <div className="px-4 py-3">
                 {editing && editForm && (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 mb-3 pb-3 border-b border-surface-4">
+                  <div className="mb-3 pb-3 border-b border-surface-4">
+                    <div className="mb-2 rounded-lg border border-brand-200 bg-brand-50 px-3 py-2">
+                      <p className="text-xs font-semibold text-brand-700">
+                        Editing EMI #{emi.emi_no} for due date {format(dueDate, 'dd MMM yyyy')}
+                      </p>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
                     <input type="number" value={editForm.emi_no} onChange={e => setField('emi_no', e.target.value)} className="input py-2 text-sm" placeholder="EMI No" />
                     <input type="date" value={editForm.due_date} onChange={e => setField('due_date', e.target.value)} className="input py-2 text-sm" />
                     <input type="number" value={editForm.amount} onChange={e => setField('amount', e.target.value)} className="input py-2 text-sm" placeholder="EMI Amount" />
@@ -222,8 +230,14 @@ export default function EMIScheduleTable({ emis, isAdmin, nextUnpaidNo, onRefres
                     </select>
 
                     <input type="number" value={editForm.partial_paid_amount} onChange={e => setField('partial_paid_amount', e.target.value)} className="input py-2 text-sm" placeholder="EMI Paid Amount" />
-                    <input type="datetime-local" value={editForm.partial_paid_at} onChange={e => setField('partial_paid_at', e.target.value)} className="input py-2 text-sm" />
-                    <input type="datetime-local" value={editForm.paid_at} onChange={e => setField('paid_at', e.target.value)} className="input py-2 text-sm" />
+                    <div>
+                      <p className="text-[10px] uppercase tracking-wide text-ink-muted mb-1">Partial Paid Date/Time</p>
+                      <input type="datetime-local" value={editForm.partial_paid_at} onChange={e => setField('partial_paid_at', e.target.value)} className="input py-2 text-sm" />
+                    </div>
+                    <div>
+                      <p className="text-[10px] uppercase tracking-wide text-ink-muted mb-1">Full Paid Date/Time</p>
+                      <input type="datetime-local" value={editForm.paid_at} onChange={e => setField('paid_at', e.target.value)} className="input py-2 text-sm" />
+                    </div>
                     <select value={editForm.mode} onChange={e => setField('mode', e.target.value as EditForm['mode'])} className="input py-2 text-sm">
                       <option value="">Payment Mode</option>
                       <option value="CASH">CASH</option>
@@ -231,9 +245,11 @@ export default function EMIScheduleTable({ emis, isAdmin, nextUnpaidNo, onRefres
                     </select>
 
                     <input type="text" value={editForm.utr} onChange={e => setField('utr', e.target.value)} className="input py-2 text-sm" placeholder="UTR / Reference" />
+                    <input type="number" value={Math.max(0, Number(editForm.amount || 0) - Number(editForm.partial_paid_amount || 0))} readOnly className="input py-2 text-sm bg-surface-2" placeholder="Remaining EMI" />
                     <input type="number" value={editForm.fine_amount} onChange={e => setField('fine_amount', e.target.value)} className="input py-2 text-sm" placeholder="Fine Amount" />
                     <input type="number" value={editForm.fine_paid_amount} onChange={e => setField('fine_paid_amount', e.target.value)} className="input py-2 text-sm" placeholder="Fine Paid" />
                     <input type="datetime-local" value={editForm.fine_paid_at} onChange={e => setField('fine_paid_at', e.target.value)} className="input py-2 text-sm" />
+                    <input type="number" value={Math.max(0, Number(editForm.fine_amount || 0) - Number(editForm.fine_paid_amount || 0))} readOnly className="input py-2 text-sm bg-surface-2" placeholder="Remaining Fine" />
 
                     <select value={editForm.collected_by_role} onChange={e => setField('collected_by_role', e.target.value as EditForm['collected_by_role'])} className="input py-2 text-sm">
                       <option value="">Collected by role</option>
@@ -245,6 +261,7 @@ export default function EMIScheduleTable({ emis, isAdmin, nextUnpaidNo, onRefres
                       <input type="checkbox" checked={editForm.fine_waived} onChange={e => setField('fine_waived', e.target.checked)} />
                       Fine Waived
                     </label>
+                    </div>
                   </div>
                 )}
 
