@@ -847,7 +847,7 @@ export default function CustomerPortal() {
 
         {/* Payment Details + Account Summary */}
         {session && (() => {
-          const rowCount = Math.max(12, customer?.emi_tenure || 0);
+          const rowCount = Math.max(customer?.emi_tenure || 0, sortedEmis.length, 12);
           const rowMap = new Map(sortedEmis.map(e => [e.emi_no, e]));
           const rows = Array.from({ length: rowCount }, (_, idx) => {
             const emiNo = idx + 1;
@@ -890,37 +890,37 @@ export default function CustomerPortal() {
           };
 
           return (
-            <div className="w-full max-w-full overflow-x-hidden rounded-2xl border border-blue-200 bg-white">
+            <div className="w-full max-w-full overflow-hidden rounded-2xl border border-blue-200 bg-white">
               <div className="bg-[#0f3f87] px-4 py-2.5 text-center">
-                <h3 className="text-sm font-bold tracking-wide text-white">Payment Details....</h3>
+                <h3 className="text-sm font-bold uppercase tracking-wide text-white">Payment Details</h3>
               </div>
 
-              <div className="w-full max-w-full overflow-x-hidden">
+              <div className="w-full max-w-full overflow-hidden">
                 <table className="w-full table-fixed border-collapse text-[10px] sm:text-xs">
                   <colgroup>
+                    <col style={{ width: '21%' }} />
                     <col style={{ width: '19%' }} />
                     <col style={{ width: '20%' }} />
-                    <col style={{ width: '20%' }} />
-                    <col style={{ width: '19%' }} />
+                    <col style={{ width: '18%' }} />
                     <col style={{ width: '22%' }} />
                   </colgroup>
                   <thead className="bg-blue-50 text-blue-900">
                     <tr>
-                      <th className="border-b border-r border-blue-200 px-1 py-2 text-center font-semibold leading-tight break-all">Payment</th>
-                      <th className="border-b border-r border-blue-200 px-1 py-2 text-center font-semibold leading-tight break-all">Amount</th>
-                      <th className="border-b border-r border-blue-200 px-1 py-2 text-center font-semibold leading-tight break-all">Payment<br />Date</th>
-                      <th className="border-b border-r border-blue-200 px-1 py-2 text-center font-semibold leading-tight break-all">Fine<br />Status</th>
-                      <th className="border-b border-blue-200 px-1 py-2 text-center font-semibold leading-tight break-all">Fine Payment<br />Date</th>
+                      <th className="border-b border-r border-blue-200 px-1 py-2 text-center font-semibold leading-tight break-words">Payment</th>
+                      <th className="border-b border-r border-blue-200 px-1 py-2 text-center font-semibold leading-tight break-words">Amount</th>
+                      <th className="border-b border-r border-blue-200 px-1 py-2 text-center font-semibold leading-tight break-words">Payment Date</th>
+                      <th className="border-b border-r border-blue-200 px-1 py-2 text-center font-semibold leading-tight break-words">Fine Status</th>
+                      <th className="border-b border-blue-200 px-1 py-2 text-center font-semibold leading-tight break-words">Fine Payment Date</th>
                     </tr>
                   </thead>
                   <tbody>
                     {rows.map(row => (
                       <tr key={row.key}>
-                        <td className="border-b border-r border-blue-100 px-1 py-2 text-center font-semibold text-slate-700 leading-tight break-all">{row.paymentLabel}</td>
-                        <td className="border-b border-r border-blue-100 px-1 py-2 text-center font-num text-slate-900 leading-tight break-all">{fmt(row.amount)}</td>
-                        <td className="border-b border-r border-blue-100 px-1 py-2 text-center font-num text-slate-700 leading-tight break-all">{formatCellDate(row.paymentDate)}</td>
-                        <td className={`border-b border-r border-blue-100 px-1 py-2 text-center font-semibold leading-tight break-all ${row.fineStatus === 'PAID' ? 'text-emerald-700' : row.fineStatus === 'PENDING' ? 'text-red-600' : 'text-slate-500'}`}>{row.fineStatus}</td>
-                        <td className="border-b border-blue-100 px-1 py-2 text-center font-num text-slate-700 leading-tight break-all">{formatCellDate(row.finePaymentDate)}</td>
+                        <td className="border-b border-r border-blue-100 px-1 py-2 text-center font-semibold text-slate-700 leading-tight break-words">{row.paymentLabel}</td>
+                        <td className="border-b border-r border-blue-100 px-1 py-2 text-center font-num text-slate-900 leading-tight break-words">{fmt(row.amount)}</td>
+                        <td className="border-b border-r border-blue-100 px-1 py-2 text-center font-num text-slate-700 leading-tight break-words">{formatCellDate(row.paymentDate)}</td>
+                        <td className={`border-b border-r border-blue-100 px-1 py-2 text-center font-semibold leading-tight break-words ${row.fineStatus === 'PAID' ? 'text-emerald-700' : row.fineStatus === 'PENDING' ? 'text-red-600' : 'text-slate-500'}`}>{row.fineStatus}</td>
+                        <td className="border-b border-blue-100 px-1 py-2 text-center font-num text-slate-700 leading-tight break-words">{formatCellDate(row.finePaymentDate)}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -957,7 +957,7 @@ export default function CustomerPortal() {
                 {showPaymentMore && (
                   <div className="mt-2 rounded-lg border border-blue-200 bg-white px-3 py-2 text-xs text-slate-600">
                     <p>Next due date: <span className="font-semibold text-slate-800">{formatDateOnly(dueSummary.nextDueDate)}</span></p>
-                    <p className="mt-1">Tap refresh on top if any payment update is still syncing.</p>
+                    <p className="mt-1">This section excludes reversed payments and shows only approved or recorded entries.</p>
                   </div>
                 )}
               </div>
