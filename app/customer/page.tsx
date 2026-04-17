@@ -31,6 +31,15 @@ interface MultiLoanEntry {
   retailer?: { name?: string; mobile?: string };
 }
 
+function toOrdinal(n: number) {
+  const mod10 = n % 10;
+  const mod100 = n % 100;
+  if (mod10 === 1 && mod100 !== 11) return `${n}st`;
+  if (mod10 === 2 && mod100 !== 12) return `${n}nd`;
+  if (mod10 === 3 && mod100 !== 13) return `${n}rd`;
+  return `${n}th`;
+}
+
 export default function CustomerPortal() {
   const [aadhaar, setAadhaar] = useState('');
   const [mobile, setMobile] = useState('');
@@ -46,6 +55,7 @@ export default function CustomerPortal() {
   const [isLaunchingUpi, setIsLaunchingUpi] = useState(false);
   const [pendingWhatsappShare, setPendingWhatsappShare] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [showPaymentMore, setShowPaymentMore] = useState(false);
 
   // Restore session from localStorage OR auto-login via token
   useEffect(() => {
@@ -835,70 +845,121 @@ export default function CustomerPortal() {
           </div>
         )}
 
-        {/* Payment Summary — Full Transparency */}
+        {/* Payment Details + Account Summary */}
         {session && (() => {
-          const totalEmiContract = sortedEmis.reduce((s, e) => s + Number(e.amount || 0), 0);
-          const totalEmiPaid = sortedEmis.reduce((s, e) => s + Math.min(Number(e.amount || 0), Number(e.partial_paid_amount || (e.status === 'APPROVED' ? e.amount : 0) || 0)), 0);
-          const totalEmiRemaining = Math.max(0, totalEmiContract - totalEmiPaid);
-          const totalFineAccrued = sortedEmis.reduce((s, e) => s + Math.max(Number(e.fine_amount || 0), Number(e.fine_paid_amount || 0)), 0);
-          const totalFinePaid = sortedEmis.reduce((s, e) => s + Number(e.fine_paid_amount || 0), 0);
-          const totalFineRemaining = Math.max(0, totalFineAccrued - totalFinePaid);
-          return (
-            <div className="card overflow-hidden">
-              <div className="px-5 py-3 border-b border-surface-4 bg-surface-2"><span className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Payment Summary</span></div>
-              <div className="grid gap-3 p-5 sm:grid-cols-2">
-                <div className="rounded-2xl border border-surface-4 bg-surface-2 p-4">
-                  <p className="text-xs uppercase tracking-wide text-slate-500 mb-1">EMI Progress</p>
-                  <p className="text-2xl font-semibold text-ink">{paidEmis.length}<span className="text-sm text-slate-500"> / {sortedEmis.length}</span></p>
-                  <div className="mt-3 space-y-1.5 text-sm">
-                    <div className="flex justify-between"><span className="text-slate-500">EMI paid</span><span className="font-num text-jade-400">{fmt(totalEmiPaid)}</span></div>
-                    <div className="flex justify-between"><span className="text-slate-500">EMI remaining</span><span className="font-num text-ink">{fmt(totalEmiRemaining)}</span></div>
-                  </div>
-                </div>
-                <div className="rounded-2xl border border-surface-4 bg-surface-2 p-4">
-                  <p className="text-xs uppercase tracking-wide text-slate-500 mb-1">Fine Summary</p>
-                  <div className="space-y-1.5 text-sm mt-3">
-                    <div className="flex justify-between"><span className="text-slate-500">Fine accrued</span><span className="font-num text-crimson-400">{fmt(totalFineAccrued)}</span></div>
-                    <div className="flex justify-between"><span className="text-slate-500">Fine paid</span><span className="font-num text-jade-400">{fmt(totalFinePaid)}</span></div>
-                    <div className="flex justify-between"><span className="text-slate-500">Fine remaining</span><span className="font-num text-crimson-400">{fmt(totalFineRemaining)}</span></div>
-                  </div>
-                </div>
-                <div className="rounded-2xl border border-surface-4 bg-brand-50 p-4 sm:col-span-2 flex items-center justify-between gap-4">
-                  <div>
-                    <p className="text-xs uppercase tracking-wide text-brand-700">Next amount due</p>
-                    <p className="text-lg font-semibold text-ink">{fmt(dueSummary.totalDue)}</p>
-                    <p className="text-xs text-slate-500 mt-1">EMI {fmt(dueSummary.emiDue)} · Fine {fmt(dueSummary.totalFineRemaining)} · 1st charge {fmt(dueSummary.firstChargeDue)}</p>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-xs text-slate-500">Next due date</p>
-                    <p className="font-medium text-ink">{formatDateOnly(dueSummary.nextDueDate)}</p>
-                  </div>
-                </div>
-              </div>
-            </div>
-          );
-        })()}
+          const rowCount = Math.max(customer?.emi_tenure || 0, sortedEmis.length, 12);
+          const rowMap = new Map(sortedEmis.map(e => [e.emi_no, e]));
+          const rows = Array.from({ length: rowCount }, (_, idx) => {
+            const emiNo = idx + 1;
+            const emi = rowMap.get(emiNo);
+            const amount = Number(emi?.amount ?? customer?.emi_amount ?? 0);
+            const paidPrincipal = Math.min(
+              Number(emi?.amount ?? customer?.emi_amount ?? 0),
+              Number(emi?.partial_paid_amount || (emi?.status === 'APPROVED' ? (emi?.amount ?? customer?.emi_amount ?? 0) : 0) || 0),
+            );
+            const fineTotal = Math.max(Number(emi?.fine_amount || 0), Number(emi?.fine_paid_amount || 0));
+            const finePaid = Number(emi?.fine_paid_amount || 0);
+            return {
+              key: emi?.id || `emi-row-${emiNo}`,
+              paymentLabel: `${toOrdinal(emiNo)} Pay`,
+              amount,
+              paymentDate: emi?.paid_at || emi?.partial_paid_at || null,
+              fineStatus: fineTotal <= 0 ? '-' : finePaid >= fineTotal ? 'PAID' : 'PENDING',
+              finePaymentDate: emi?.fine_paid_at || null,
+              duePrincipal: Math.max(0, amount - paidPrincipal),
+              paidPrincipal,
+              finePending: Math.max(0, fineTotal - finePaid),
+              finePaid,
+            };
+          });
 
-        {/* Payment History — shows paid EMIs with dates */}
-        {session && sortedEmis.some(e => e.status === 'APPROVED' && e.paid_at) && (() => {
-          const paidEmis = sortedEmis.filter(e => e.status === 'APPROVED' && e.paid_at);
-          if (!paidEmis.length) return null;
+          const summary = rows.reduce((acc, row) => {
+            acc.emiDue += row.duePrincipal;
+            acc.paid += row.paidPrincipal;
+            acc.finePending += row.finePending;
+            acc.finePaid += row.finePaid;
+            return acc;
+          }, { emiDue: 0, paid: 0, finePending: 0, finePaid: 0 });
+
+          const totalDue = summary.emiDue + summary.finePending;
+          const formatCellDate = (dateLike?: string | null) => {
+            if (!dateLike) return '-';
+            const dt = new Date(dateLike);
+            if (Number.isNaN(dt.getTime())) return '-';
+            return format(dt, 'dd.MM.yy');
+          };
+
           return (
-            <div className="card overflow-hidden">
-              <div className="px-5 py-3 border-b border-surface-4"><span className="text-xs font-semibold text-slate-400 uppercase tracking-widest">📅 Payment History</span></div>
-              <div className="divide-y divide-white/[0.03]">
-                {paidEmis.map(e => (
-                  <div key={e.id} className="px-5 py-2.5 flex justify-between items-center">
-                    <div>
-                      <p className="text-sm font-medium text-ink">EMI #{e.emi_no} — {fmt(e.amount)}</p>
-                      {e.fine_paid_amount > 0 && <p className="text-xs text-crimson-400">+ Fine: {fmt(e.fine_paid_amount)}{e.fine_paid_at ? ` (${format(new Date(e.fine_paid_at), 'd MMM')})` : ''}</p>}
-                    </div>
-                    <div className="text-right">
-                      <p className="text-xs text-jade-400 font-semibold">✓ Paid</p>
-                      {e.paid_at && <p className="text-[10px] text-slate-500">{format(new Date(e.paid_at), 'd MMM yyyy')}</p>}
-                    </div>
+            <div className="w-full max-w-full overflow-hidden rounded-2xl border border-blue-200 bg-white">
+              <div className="bg-[#0f3f87] px-4 py-2.5 text-center">
+                <h3 className="text-sm font-bold uppercase tracking-wide text-white">Payment Details</h3>
+              </div>
+
+              <div className="w-full max-w-full overflow-hidden">
+                <table className="w-full table-fixed border-collapse text-[10px] sm:text-xs">
+                  <colgroup>
+                    <col style={{ width: '21%' }} />
+                    <col style={{ width: '19%' }} />
+                    <col style={{ width: '20%' }} />
+                    <col style={{ width: '18%' }} />
+                    <col style={{ width: '22%' }} />
+                  </colgroup>
+                  <thead className="bg-blue-50 text-blue-900">
+                    <tr>
+                      <th className="border-b border-r border-blue-200 px-1 py-2 text-center font-semibold leading-tight break-words">Payment</th>
+                      <th className="border-b border-r border-blue-200 px-1 py-2 text-center font-semibold leading-tight break-words">Amount</th>
+                      <th className="border-b border-r border-blue-200 px-1 py-2 text-center font-semibold leading-tight break-words">Payment Date</th>
+                      <th className="border-b border-r border-blue-200 px-1 py-2 text-center font-semibold leading-tight break-words">Fine Status</th>
+                      <th className="border-b border-blue-200 px-1 py-2 text-center font-semibold leading-tight break-words">Fine Payment Date</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {rows.map(row => (
+                      <tr key={row.key}>
+                        <td className="border-b border-r border-blue-100 px-1 py-2 text-center font-semibold text-slate-700 leading-tight break-words">{row.paymentLabel}</td>
+                        <td className="border-b border-r border-blue-100 px-1 py-2 text-center font-num text-slate-900 leading-tight break-words">{fmt(row.amount)}</td>
+                        <td className="border-b border-r border-blue-100 px-1 py-2 text-center font-num text-slate-700 leading-tight break-words">{formatCellDate(row.paymentDate)}</td>
+                        <td className={`border-b border-r border-blue-100 px-1 py-2 text-center font-semibold leading-tight break-words ${row.fineStatus === 'PAID' ? 'text-emerald-700' : row.fineStatus === 'PENDING' ? 'text-red-600' : 'text-slate-500'}`}>{row.fineStatus}</td>
+                        <td className="border-b border-blue-100 px-1 py-2 text-center font-num text-slate-700 leading-tight break-words">{formatCellDate(row.finePaymentDate)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              <div className="border-t border-blue-200 bg-[#ecf5ff] p-4">
+                <h4 className="mb-2 text-sm font-bold text-[#0f3f87]">Account Summary</h4>
+                <div className="space-y-1.5 text-sm">
+                  <div className="flex items-center justify-between"><span className="text-slate-700">EMI Due Amount</span><span className="font-num font-semibold text-red-600">{fmt(summary.emiDue)}</span></div>
+                  <div className="flex items-center justify-between"><span className="text-slate-700">Paid Amount</span><span className="font-num font-semibold text-emerald-700">{fmt(summary.paid)}</span></div>
+                  <div className="flex items-center justify-between"><span className="text-slate-700">Fine Pending</span><span className="font-num font-semibold text-red-600">{fmt(summary.finePending)}</span></div>
+                  <div className="flex items-center justify-between"><span className="text-slate-700">Fine Paid</span><span className="font-num font-semibold text-emerald-700">{fmt(summary.finePaid)}</span></div>
+                  <div className="my-2 h-px bg-blue-200" />
+                  <div className="flex items-center justify-between"><span className="font-semibold text-[#0f3f87]">Total Due (EMI + Fine)</span><span className="font-num text-lg font-bold text-red-700">{fmt(totalDue)}</span></div>
+                </div>
+
+                <div className="mt-4 grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => shareOnWhatsapp(totalDue)}
+                    className="rounded-lg border border-blue-300 bg-white px-3 py-2 text-xs font-semibold text-blue-900 transition hover:bg-blue-50"
+                  >
+                    Share Details
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setShowPaymentMore(v => !v)}
+                    className="rounded-lg border border-blue-300 bg-white px-3 py-2 text-xs font-semibold text-blue-900 transition hover:bg-blue-50"
+                  >
+                    More...
+                  </button>
+                </div>
+                {showPaymentMore && (
+                  <div className="mt-2 rounded-lg border border-blue-200 bg-white px-3 py-2 text-xs text-slate-600">
+                    <p>Next due date: <span className="font-semibold text-slate-800">{formatDateOnly(dueSummary.nextDueDate)}</span></p>
+                    <p className="mt-1">This section excludes reversed payments and shows only approved or recorded entries.</p>
                   </div>
-                ))}
+                )}
               </div>
             </div>
           );
