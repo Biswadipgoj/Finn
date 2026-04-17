@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { Customer, EMISchedule, DueBreakdown } from '@/lib/types';
 import { format, differenceInDays } from 'date-fns';
 import toast from 'react-hot-toast';
@@ -45,6 +45,8 @@ export default function CustomerPortal() {
   const [dismissedBroadcasts, setDismissedBroadcasts] = useState<Set<string>>(new Set());
   const [isLaunchingUpi, setIsLaunchingUpi] = useState(false);
   const [pendingWhatsappShare, setPendingWhatsappShare] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const upiReturnHandledRef = useRef(false);
 
   // Restore session from localStorage OR auto-login via token
   useEffect(() => {
@@ -182,6 +184,54 @@ export default function CustomerPortal() {
     setMobile('');
   }
 
+  function applySessionPayload(data: { customer?: Customer; emis?: EMISchedule[]; breakdown?: DueBreakdown | null; broadcasts?: { id: string; message: string; image_url?: string | null; expires_at: string; sender_name?: string; sender_role?: string }[] }) {
+    if (!data?.customer) return false;
+    const newSession: CustomerSession = {
+      customer: data.customer,
+      emis: data.emis || [],
+      breakdown: data.breakdown || null,
+    };
+    setSession(newSession);
+    localStorage.setItem(SESSION_KEY, JSON.stringify(newSession));
+    if (data.broadcasts?.length) setBroadcastMessages(data.broadcasts);
+    return true;
+  }
+
+  async function refreshSession() {
+    if (!session?.customer?.id) {
+      toast.error('Unable to refresh this session.');
+      return;
+    }
+    setIsRefreshing(true);
+    try {
+      const token = localStorage.getItem(TOKEN_KEY);
+      if (token) {
+        const tokenRes = await fetch('/api/customer-app-token?token=' + token);
+        const tokenData = await readJsonSafe<{ customer?: Customer; emis?: EMISchedule[]; breakdown?: DueBreakdown | null; broadcasts?: { id: string; message: string; image_url?: string | null; expires_at: string; sender_name?: string; sender_role?: string }[] }>(tokenRes) || {};
+        if (tokenRes.ok && applySessionPayload(tokenData)) {
+          toast.success('Latest account data loaded.');
+          return;
+        }
+      }
+
+      const res = await fetch('/api/customer-login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ customer_id: session.customer.id }),
+      });
+      const data = await readJsonSafe<{ customer?: Customer; emis?: EMISchedule[]; breakdown?: DueBreakdown | null; broadcasts?: { id: string; message: string; image_url?: string | null; expires_at: string; sender_name?: string; sender_role?: string }[]; error?: string }>(res) || {};
+      if (!res.ok || !applySessionPayload(data)) {
+        toast.error(data.error || 'Refresh failed. Try again.');
+        return;
+      }
+      toast.success('Latest account data loaded.');
+    } catch {
+      toast.error('Refresh failed. Check your internet and retry.');
+    } finally {
+      setIsRefreshing(false);
+    }
+  }
+
   const { customer, emis, breakdown } = session ?? { customer: null, emis: [], breakdown: null };
   const sortedEmis = useMemo(
     () => [...emis].sort((a, b) => new Date(a.due_date).getTime() - new Date(b.due_date).getTime()),
@@ -224,6 +274,30 @@ export default function CustomerPortal() {
     };
   }, [sortedEmis, breakdown, customer]);
 
+  const payableNow = useMemo(() => {
+    const openEmi = sortedEmis.find(e => e.status === 'UNPAID' || e.status === 'PARTIALLY_PAID');
+    if (!openEmi) {
+      return {
+        emiNo: null as number | null,
+        emiDue: 0,
+        fineDue: 0,
+        firstChargeDue: customer?.first_emi_charge_paid_at ? 0 : Number(customer?.first_emi_charge_amount || 0),
+        totalDue: customer?.first_emi_charge_paid_at ? 0 : Number(customer?.first_emi_charge_amount || 0),
+      };
+    }
+
+    const emiDue = Math.max(0, Number(openEmi.amount || 0) - Number(openEmi.partial_paid_amount || 0));
+    const fineDue = openEmi.fine_waived ? 0 : Math.max(0, Number(openEmi.fine_amount || 0) - Number(openEmi.fine_paid_amount || 0));
+    const firstChargeDue = customer?.first_emi_charge_paid_at ? 0 : Number(customer?.first_emi_charge_amount || 0);
+    return {
+      emiNo: openEmi.emi_no,
+      emiDue,
+      fineDue,
+      firstChargeDue,
+      totalDue: emiDue + fineDue + firstChargeDue,
+    };
+  }, [sortedEmis, customer]);
+
   async function buildReceiptFile(totalAmount: number) {
     const canvas = document.createElement('canvas');
     canvas.width = 1080;
@@ -240,9 +314,9 @@ export default function CustomerPortal() {
       `Name: ${customer?.customer_name || '-'}`,
       `Mobile: ${customer?.mobile || '-'}`,
       `IMEI: ${customer?.imei || '-'}`,
-      `EMI Due: ${fmt(dueSummary.emiDue)}`,
-      `Fine Due: ${fmt(dueSummary.totalFineRemaining)}`,
-      `1st EMI Charge: ${fmt(dueSummary.firstChargeDue)}`,
+      `EMI #${payableNow.emiNo || '-'} Due: ${fmt(payableNow.emiDue)}`,
+      `Fine Due (Current EMI): ${fmt(payableNow.fineDue)}`,
+      `1st EMI Charge: ${fmt(payableNow.firstChargeDue)}`,
       `Total Amount: ${fmt(totalAmount)}`,
       `Date: ${format(new Date(), 'd MMM yyyy, h:mm a')}`,
       'Payment Mode: UPI',
@@ -263,9 +337,9 @@ export default function CustomerPortal() {
       `Customer: ${customer?.customer_name || '-'}`,
       `Mobile: ${customer?.mobile || '-'}`,
       `IMEI: ${customer?.imei || '-'}`,
-      `EMI Due: ${fmt(dueSummary.emiDue)}`,
-      `Fine Due: ${fmt(dueSummary.totalFineRemaining)}`,
-      `1st EMI Charge: ${fmt(dueSummary.firstChargeDue)}`,
+      `EMI #${payableNow.emiNo || '-'} Due: ${fmt(payableNow.emiDue)}`,
+      `Fine Due (Current EMI): ${fmt(payableNow.fineDue)}`,
+      `1st EMI Charge: ${fmt(payableNow.firstChargeDue)}`,
       `Total Paid: ${fmt(totalAmount)}`,
       `Paid On: ${format(new Date(), 'd MMM yyyy, h:mm a')}`,
     ].join('\n');
@@ -278,7 +352,25 @@ export default function CustomerPortal() {
     } catch {
       // fall back to whatsapp deep link
     }
-    window.open(`https://wa.me/917003617029?text=${encodeURIComponent(text)}`, '_blank');
+    const encodedText = encodeURIComponent(text);
+    const phone = '917003617029';
+    const mobileDeepLink = `whatsapp://send?phone=${phone}&text=${encodedText}`;
+    const webLink = `https://wa.me/${phone}?text=${encodedText}`;
+    const desktopLink = `https://web.whatsapp.com/send?phone=${phone}&text=${encodedText}`;
+    const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+
+    if (isMobile) {
+      window.location.href = mobileDeepLink;
+      setTimeout(() => {
+        window.open(webLink, '_blank', 'noopener,noreferrer');
+      }, 1200);
+    } else {
+      window.open(desktopLink, '_blank', 'noopener,noreferrer');
+      setTimeout(() => {
+        window.open(webLink, '_blank', 'noopener,noreferrer');
+      }, 900);
+    }
+
     if (file) {
       const url = URL.createObjectURL(file);
       const a = document.createElement('a');
@@ -291,25 +383,51 @@ export default function CustomerPortal() {
   }
 
   async function handleOnlinePay() {
-    if (!customer || dueSummary.totalDue <= 0) return;
-    const amount = Number(dueSummary.totalDue.toFixed(2));
-    const upiUrl = `upi://pay?pa=7003617029@upi&pn=TelePoint&am=${amount}&cu=INR&tn=${encodeURIComponent(`EMI ${customer.customer_name}`)}`;
+    if (!customer || payableNow.totalDue <= 0) return;
+    const amount = Number(payableNow.totalDue.toFixed(2));
+    const reference = customer.imei || customer.id;
+    const note = `EMI ${payableNow.emiNo || ''} ${customer.customer_name} (${reference})`;
+    const upiUrl = `upi://pay?pa=7003617029@upi&pn=TelePoint&am=${amount}&cu=INR&tn=${encodeURIComponent(note)}&tr=${encodeURIComponent(reference)}`;
+    toast.success('Opening UPI app with exact payable amount. After payment, WhatsApp share will open.');
+    upiReturnHandledRef.current = false;
     setPendingWhatsappShare(true);
     setIsLaunchingUpi(true);
     window.location.href = upiUrl;
   }
 
   useEffect(() => {
-    function onVisible() {
-      if (document.visibilityState === 'visible' && pendingWhatsappShare && isLaunchingUpi) {
-        setIsLaunchingUpi(false);
-        setPendingWhatsappShare(false);
-        shareOnWhatsapp(dueSummary.totalDue);
-      }
+    if (!pendingWhatsappShare || !isLaunchingUpi) return;
+
+    function triggerWhatsappShare() {
+      if (upiReturnHandledRef.current) return;
+      if (document.visibilityState !== 'visible') return;
+      upiReturnHandledRef.current = true;
+      setIsLaunchingUpi(false);
+      setPendingWhatsappShare(false);
+      setTimeout(() => {
+        shareOnWhatsapp(payableNow.totalDue);
+      }, 250);
     }
-    document.addEventListener('visibilitychange', onVisible);
-    return () => document.removeEventListener('visibilitychange', onVisible);
-  }, [pendingWhatsappShare, isLaunchingUpi, dueSummary.totalDue]);
+
+    const onVisibility = () => triggerWhatsappShare();
+    const onFocus = () => triggerWhatsappShare();
+    const onPageShow = () => triggerWhatsappShare();
+
+    document.addEventListener('visibilitychange', onVisibility);
+    window.addEventListener('focus', onFocus);
+    window.addEventListener('pageshow', onPageShow);
+
+    const fallbackTimer = window.setTimeout(() => {
+      triggerWhatsappShare();
+    }, 45000);
+
+    return () => {
+      document.removeEventListener('visibilitychange', onVisibility);
+      window.removeEventListener('focus', onFocus);
+      window.removeEventListener('pageshow', onPageShow);
+      window.clearTimeout(fallbackTimer);
+    };
+  }, [pendingWhatsappShare, isLaunchingUpi, payableNow.totalDue]);
 
   if (!session) {
     // Multi-loan selection screen
@@ -447,23 +565,12 @@ export default function CustomerPortal() {
           </div>
           <div className="flex items-center gap-3">
             <span className="text-sm text-slate-400 hidden sm:block">{customer?.customer_name}</span>
-            <button onClick={async () => {
-              const t = localStorage.getItem(TOKEN_KEY);
-              if (t) {
-                try {
-                  const r = await fetch('/api/customer-app-token?token=' + t);
-                  const d = await r.json();
-                  if (d.customer) {
-                    const ns = { customer: d.customer, emis: d.emis || [], breakdown: d.breakdown || null };
-                    setSession(ns);
-                    localStorage.setItem(SESSION_KEY, JSON.stringify(ns));
-                    if (d.broadcasts?.length) setBroadcastMessages(d.broadcasts);
-                    toast.success('Data refreshed');
-                  }
-                } catch { toast.error('Refresh failed'); }
-              }
-            }} className="text-xs text-jade-400 hover:text-jade-500 transition-colors border border-white/[0.08] px-3 py-1.5 rounded-lg mr-2">
-              🔄 Refresh
+            <button
+              onClick={refreshSession}
+              disabled={isRefreshing}
+              className="text-xs text-jade-500 hover:text-jade-600 transition-colors border border-jade-200 px-3 py-1.5 rounded-lg mr-2 disabled:opacity-50"
+            >
+              {isRefreshing ? 'Refreshing…' : '🔄 Refresh'}
             </button>
             <button onClick={() => { setSession(null); localStorage.removeItem(SESSION_KEY); localStorage.removeItem(TOKEN_KEY); }} className="text-xs text-slate-500 hover:text-brand-400 transition-colors border border-white/[0.08] px-3 py-1.5 rounded-lg">
               Switch
@@ -643,15 +750,29 @@ export default function CustomerPortal() {
             <div className="card p-5">
               <p className="text-xs font-semibold text-slate-400 uppercase tracking-widest mb-4">Next Payment Due</p>
               <div className="space-y-2.5">
-                {dueSummary.emiDue > 0 && <div className="flex justify-between text-sm"><span className="text-slate-400">EMI #{dueSummary.nextEmiNo || breakdown?.next_emi_no}</span><span className="font-num text-ink">{fmt(dueSummary.emiDue)}</span></div>}
+                {payableNow.emiDue > 0 && <div className="flex justify-between text-sm"><span className="text-slate-400">EMI #{payableNow.emiNo || breakdown?.next_emi_no}</span><span className="font-num text-ink">{fmt(payableNow.emiDue)}</span></div>}
                 {dueSummary.emiPaid > 0 && <div className="flex justify-between text-sm"><span className="text-amber-600">Already paid for this EMI</span><span className="font-num text-amber-600">{fmt(dueSummary.emiPaid)}</span></div>}
-                {dueSummary.totalFineRemaining > 0 && <div className="flex justify-between text-sm"><span className="text-crimson-400">Fine due</span><span className="font-num text-crimson-400">{fmt(dueSummary.totalFineRemaining)}</span></div>}
-                {dueSummary.firstChargeDue > 0 && <div className="flex justify-between text-sm"><span className="text-gold-400">1st EMI charge</span><span className="font-num text-gold-400">{fmt(dueSummary.firstChargeDue)}</span></div>}
+                {payableNow.fineDue > 0 && <div className="flex justify-between text-sm"><span className="text-crimson-400">Fine due (current EMI)</span><span className="font-num text-crimson-400">{fmt(payableNow.fineDue)}</span></div>}
+                {payableNow.firstChargeDue > 0 && <div className="flex justify-between text-sm"><span className="text-gold-400">1st EMI charge</span><span className="font-num text-gold-400">{fmt(payableNow.firstChargeDue)}</span></div>}
                 <div className="h-px bg-white/[0.06]" />
-                <div className="flex justify-between"><span className="font-semibold text-ink">Total Payable</span><span className="font-num text-xl font-bold text-gold-400">{fmt(totalDue)}</span></div>
+                <div className="flex justify-between"><span className="font-semibold text-ink">Pay Now (Auto)</span><span className="font-num text-xl font-bold text-gold-400">{fmt(payableNow.totalDue)}</span></div>
+                {dueSummary.totalDue > payableNow.totalDue && (
+                  <div className="flex justify-between text-xs text-slate-500">
+                    <span>Total outstanding</span>
+                    <span className="font-num">{fmt(dueSummary.totalDue)}</span>
+                  </div>
+                )}
               </div>
               {dueSummary.nextDueDate && <p className="text-xs text-slate-500 mt-3">Due: {format(new Date(dueSummary.nextDueDate), 'd MMM yyyy')}</p>}
-              <p className="text-xs text-slate-600 mt-2">Pay online via UPI and auto-share receipt on WhatsApp.</p>
+              <div className="mt-4">
+                <button
+                  onClick={handleOnlinePay}
+                  disabled={payableNow.totalDue <= 0}
+                  className="btn-primary w-full py-3 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Pay Online via UPI
+                </button>
+              </div>
             </div>
           ) : null;
         })()}
