@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { Fragment, useState, useEffect, useCallback, useRef } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { Customer, Retailer, EMISchedule, DueBreakdown, PaymentRequest } from '@/lib/types';
 import NavBar from '@/components/NavBar';
@@ -35,7 +35,30 @@ interface FilteredEMI {
   first_emi_charge_remaining?: number;
 }
 
+interface MonthlyCollectionPaymentRow {
+  id: string;
+  retailerId: string;
+  retailerName: string;
+  paymentDate: string | null;
+  customerName: string;
+  mobile: string;
+  emiPaid: number;
+  finePaid: number;
+  totalPaid: number;
+  paymentMode: string;
+  utr: string;
+  status: string;
+}
+
 const fmt = formatCurrency;
+
+const RETAILER_GROUP_STYLES = [
+  { bg: 'bg-sky-50', border: 'border-sky-300', text: 'text-sky-900', accent: 'bg-sky-500' },
+  { bg: 'bg-emerald-50', border: 'border-emerald-300', text: 'text-emerald-900', accent: 'bg-emerald-500' },
+  { bg: 'bg-amber-50', border: 'border-amber-300', text: 'text-amber-900', accent: 'bg-amber-500' },
+  { bg: 'bg-violet-50', border: 'border-violet-300', text: 'text-violet-900', accent: 'bg-violet-500' },
+  { bg: 'bg-slate-100', border: 'border-slate-300', text: 'text-slate-900', accent: 'bg-slate-500' },
+] as const;
 
 async function exportCSV(supabase: ReturnType<typeof createClient>, type: string) {
   toast('Generating report...', { icon: '📊' });
@@ -161,6 +184,9 @@ export default function AdminDashboard() {
   const [reportLoading, setReportLoading] = useState(false);
   const [reportMonth, setReportMonth] = useState(new Date().getMonth() + 1);
   const [reportYear, setReportYear] = useState(new Date().getFullYear());
+  const [monthlyCollectionRows, setMonthlyCollectionRows] = useState<MonthlyCollectionPaymentRow[]>([]);
+  const [monthlyCollectionLoading, setMonthlyCollectionLoading] = useState(false);
+  const [monthlyCollectionError, setMonthlyCollectionError] = useState('');
 
   // Broadcast message state
   const [broadcastRetailerId, setBroadcastRetailerId] = useState('');
@@ -194,6 +220,11 @@ export default function AdminDashboard() {
     loadPendingCount();
     loadBroadcasts();
   }, []);
+
+  useEffect(() => {
+    if (tab !== 'reports') return;
+    void loadMonthlyCollectionReport(reportMonth, reportYear);
+  }, [tab, reportMonth, reportYear]);
 
   async function loadPendingCount() {
     const { count } = await supabase.from('payment_requests').select('*', { count: 'exact', head: true }).eq('status', 'PENDING');
@@ -376,6 +407,83 @@ export default function AdminDashboard() {
     } finally { setReportLoading(false); }
   }
 
+  function getRetailerGroupStyle(retailerKey: string) {
+    let hash = 0;
+    for (let i = 0; i < retailerKey.length; i++) hash = ((hash << 5) - hash + retailerKey.charCodeAt(i)) | 0;
+    const idx = Math.abs(hash) % RETAILER_GROUP_STYLES.length;
+    return RETAILER_GROUP_STYLES[idx];
+  }
+
+  function formatIstDateTime(value?: string | null): string {
+    if (!value) return '-';
+    const d = new Date(value);
+    if (Number.isNaN(d.getTime())) return '-';
+    return new Intl.DateTimeFormat('en-IN', {
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: true,
+      timeZone: 'Asia/Kolkata',
+    }).format(d);
+  }
+
+  async function loadMonthlyCollectionReport(month: number, year: number) {
+    setMonthlyCollectionLoading(true);
+    setMonthlyCollectionError('');
+    try {
+      const start = new Date(Date.UTC(year, month - 1, 1, 0, 0, 0)).toISOString();
+      const end = new Date(Date.UTC(year, month, 0, 23, 59, 59)).toISOString();
+      const { data, error } = await supabase
+        .from('payment_requests')
+        .select(`
+          id, approved_at, status, mode, utr, total_emi_amount, fine_amount, total_amount,
+          retailer:retailers(id, name),
+          customer:customers(customer_name, mobile)
+        `)
+        .eq('status', 'APPROVED')
+        .gte('approved_at', start)
+        .lte('approved_at', end)
+        .order('approved_at', { ascending: true });
+
+      if (error) {
+        setMonthlyCollectionRows([]);
+        setMonthlyCollectionError(error.message || 'Failed to load monthly collection report.');
+        return;
+      }
+
+      const mapped = ((data || []) as Record<string, unknown>[]).map((row) => {
+        const retailer = (row.retailer as { id?: string; name?: string } | null) || {};
+        const customer = (row.customer as { customer_name?: string; mobile?: string } | null) || {};
+        return {
+          id: String(row.id || ''),
+          retailerId: retailer.id || 'unknown',
+          retailerName: retailer.name || 'Unknown Retailer',
+          paymentDate: (row.approved_at as string | null) || null,
+          customerName: customer.customer_name || '-',
+          mobile: customer.mobile || '-',
+          emiPaid: Number(row.total_emi_amount || 0),
+          finePaid: Number(row.fine_amount || 0),
+          totalPaid: Number(row.total_amount || 0),
+          paymentMode: String(row.mode || '-'),
+          utr: String(row.utr || '-'),
+          status: String(row.status || '-'),
+        } satisfies MonthlyCollectionPaymentRow;
+      });
+
+      mapped.sort((a, b) => {
+        const byRetailer = a.retailerName.localeCompare(b.retailerName);
+        if (byRetailer !== 0) return byRetailer;
+        return new Date(a.paymentDate || 0).getTime() - new Date(b.paymentDate || 0).getTime();
+      });
+
+      setMonthlyCollectionRows(mapped);
+    } finally {
+      setMonthlyCollectionLoading(false);
+    }
+  }
+
   async function handleDeleteCustomer() {
     if (!selectedCustomer || !deleteRemark.trim()) { toast.error('Deletion reason required'); return; }
     const { error } = await supabase.from('customers').delete().eq('id', selectedCustomer.id);
@@ -508,6 +616,48 @@ export default function AdminDashboard() {
   }
 
   const paidCount = customerEmis.filter((e) => e.status === 'APPROVED').length;
+  const groupedMonthlyRows = monthlyCollectionRows.reduce<Record<string, MonthlyCollectionPaymentRow[]>>((acc, row) => {
+    const key = `${row.retailerId}::${row.retailerName}`;
+    if (!acc[key]) acc[key] = [];
+    acc[key].push(row);
+    return acc;
+  }, {});
+
+  function downloadGroupedMonthlyCsv() {
+    if (!monthlyCollectionRows.length) {
+      toast.error('No monthly collection rows to export');
+      return;
+    }
+    const lines: string[] = [];
+    for (const [groupKey, rows] of Object.entries(groupedMonthlyRows)) {
+      const retailerName = groupKey.split('::')[1] || 'Unknown Retailer';
+      lines.push(`RETAILER: ${retailerName}`);
+      lines.push('Payment Date (IST),Customer Name,Mobile,EMI Paid,Fine Paid,Total Paid,Payment Mode,UTR,Status');
+      for (const row of rows) {
+        lines.push([
+          formatIstDateTime(row.paymentDate),
+          row.customerName,
+          row.mobile,
+          row.emiPaid,
+          row.finePaid,
+          row.totalPaid,
+          row.paymentMode,
+          row.utr === '-' ? '' : row.utr,
+          row.status,
+        ].map((cell) => JSON.stringify(cell ?? '')).join(','));
+      }
+      lines.push('');
+    }
+    const blob = new Blob([lines.join('\n')], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    const monthTag = `${String(reportMonth).padStart(2, '0')}-${reportYear}`;
+    a.href = url;
+    a.download = `monthly_collection_grouped_${monthTag}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+    toast.success('Downloaded grouped Monthly Collection CSV');
+  }
 
   return (
     <div className="min-h-screen page-bg">
@@ -938,6 +1088,118 @@ export default function AdminDashboard() {
                   >
                     📥 Download CSV
                   </a>
+                  <a
+                    href={`/api/report/monthly?month=${reportMonth}&year=${reportYear}&format=xlsx`}
+                    download
+                    className="btn-secondary"
+                  >
+                    📊 Download XLSX
+                  </a>
+                  <button onClick={downloadGroupedMonthlyCsv} className="btn-secondary">
+                    📥 Download Grouped CSV
+                  </button>
+                  <button onClick={() => window.print()} className="btn-secondary no-print">
+                    🖨️ Print Grouped View
+                  </button>
+                </div>
+
+                <div className="mt-5 rounded-xl border border-surface-4 overflow-hidden">
+                  <div className="px-4 py-3 border-b border-surface-4 bg-surface-2">
+                    <p className="text-sm font-semibold text-ink">Monthly Collection (Grouped by Retailer)</p>
+                    <p className="text-xs text-ink-muted mt-1">Retailer headers are centered and color-coded for quick scanning.</p>
+                  </div>
+                  {monthlyCollectionLoading ? (
+                    <div className="px-4 py-6 text-sm text-ink-muted">Loading monthly collections…</div>
+                  ) : monthlyCollectionError ? (
+                    <div className="px-4 py-6 text-sm text-danger">{monthlyCollectionError}</div>
+                  ) : monthlyCollectionRows.length === 0 ? (
+                    <div className="px-4 py-6 text-sm text-ink-muted">No approved collections found for selected month.</div>
+                  ) : (
+                    <>
+                      <div className="hidden md:block overflow-x-auto">
+                        <table className="data-table text-sm">
+                          <thead>
+                            <tr>
+                              <th>Payment Date (IST)</th>
+                              <th>Customer Name</th>
+                              <th>Mobile</th>
+                              <th>EMI Paid</th>
+                              <th>Fine Paid</th>
+                              <th>Total Paid</th>
+                              <th>Payment Mode</th>
+                              <th>UTR</th>
+                              <th>Status</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {Object.entries(groupedMonthlyRows).map(([groupKey, rows]) => {
+                              const retailerName = groupKey.split('::')[1] || 'Unknown Retailer';
+                              const style = getRetailerGroupStyle(groupKey);
+                              return (
+                                <Fragment key={`group-fragment-${groupKey}`}>
+                                  <tr className={`${style.bg} ${style.text} border-y ${style.border}`}>
+                                    <td colSpan={9} className="!text-center !align-middle font-bold py-3 tracking-wide">
+                                      <div className="flex items-center justify-center gap-3">
+                                        <span className={`inline-block w-2 h-6 rounded-full ${style.accent}`} />
+                                        <span className="whitespace-normal break-words">RETAILER: {retailerName}</span>
+                                      </div>
+                                    </td>
+                                  </tr>
+                                  {rows.map((row) => (
+                                    <tr key={row.id} className="hover:bg-surface-2/70">
+                                      <td className="font-num text-xs">{formatIstDateTime(row.paymentDate)}</td>
+                                      <td className="font-medium">{row.customerName}</td>
+                                      <td className="font-num">{row.mobile}</td>
+                                      <td className="font-num">{fmt(row.emiPaid)}</td>
+                                      <td className="font-num">{fmt(row.finePaid)}</td>
+                                      <td className="font-num font-semibold">{fmt(row.totalPaid)}</td>
+                                      <td>{row.paymentMode}</td>
+                                      <td className="font-num text-xs">{row.utr === '-' ? '—' : row.utr}</td>
+                                      <td><span className="text-xs font-semibold text-success">{row.status}</span></td>
+                                    </tr>
+                                  ))}
+                                </Fragment>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+
+                      <div className="md:hidden divide-y divide-surface-4">
+                        {Object.entries(groupedMonthlyRows).map(([groupKey, rows]) => {
+                          const retailerName = groupKey.split('::')[1] || 'Unknown Retailer';
+                          const style = getRetailerGroupStyle(groupKey);
+                          return (
+                            <section key={`mobile-${groupKey}`} className="p-3">
+                              <div className={`rounded-lg border ${style.border} ${style.bg} ${style.text} px-3 py-2 mb-3 text-center font-bold`}>
+                                <div className="flex items-center justify-center gap-2">
+                                  <span className={`inline-block w-1.5 h-5 rounded-full ${style.accent}`} />
+                                  <span className="whitespace-normal break-words">RETAILER: {retailerName}</span>
+                                </div>
+                              </div>
+                              <div className="space-y-2">
+                                {rows.map((row) => (
+                                  <article key={row.id} className="rounded-lg border border-surface-4 bg-white p-3">
+                                    <div className="grid grid-cols-2 gap-x-2 gap-y-1 text-xs">
+                                      <span className="text-ink-muted">Payment Date</span><span className="text-right font-num">{formatIstDateTime(row.paymentDate)}</span>
+                                      <span className="text-ink-muted">Customer</span><span className="text-right font-medium">{row.customerName}</span>
+                                      <span className="text-ink-muted">Mobile</span><span className="text-right font-num">{row.mobile}</span>
+                                      <span className="text-ink-muted">EMI Paid</span><span className="text-right font-num">{fmt(row.emiPaid)}</span>
+                                      <span className="text-ink-muted">Fine Paid</span><span className="text-right font-num">{fmt(row.finePaid)}</span>
+                                      <span className="text-ink-muted">Total Paid</span><span className="text-right font-num font-semibold">{fmt(row.totalPaid)}</span>
+                                      <span className="text-ink-muted">Payment Mode</span><span className="text-right">{row.paymentMode}</span>
+                                      <span className="text-ink-muted">UTR</span><span className="text-right font-num">{row.utr === '-' ? '—' : row.utr}</span>
+                                      <span className="text-ink-muted">Status</span><span className="text-right text-success font-semibold">{row.status}</span>
+                                    </div>
+                                  </article>
+                                ))}
+                              </div>
+                            </section>
+                          );
+                        })}
+                      </div>
+                    </>
+                  )}
                 </div>
               </div>
 
