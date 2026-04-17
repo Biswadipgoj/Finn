@@ -12,6 +12,23 @@ function statusLabel(customer: Customer) {
   return customer.status || '-';
 }
 
+function emiPrincipalPaidForRow(emi: EMISchedule, defaultEmiAmount: number) {
+  const scheduledAmount = toNumber(emi.amount, defaultEmiAmount);
+  const partialPaid = Math.max(0, toNumber(emi.partial_paid_amount));
+
+  if (emi.status === 'APPROVED') {
+    // In some migrated rows, partial_paid_amount may carry the paid principal
+    // while amount can be stale/zero. Use the highest reliable principal value.
+    return Math.max(scheduledAmount, partialPaid, defaultEmiAmount);
+  }
+
+  if (emi.status === 'PARTIALLY_PAID') {
+    return Math.min(scheduledAmount || defaultEmiAmount, partialPaid);
+  }
+
+  return 0;
+}
+
 export default function PaymentSummaryCard({
   customer,
   emis,
@@ -22,20 +39,23 @@ export default function PaymentSummaryCard({
   breakdown?: DueBreakdown | null;
 }) {
   const sorted = [...emis].sort((a, b) => a.emi_no - b.emi_no);
-  const totalEmis = toNumber(customer.emi_tenure);
-  const paidEmis = sorted.filter(e => e.status === 'APPROVED').length;
-  const loanAmount = toNumber(customer.disburse_amount, toNumber(customer.purchase_value) - toNumber(customer.down_payment));
+
+  const totalEmis = toNumber(customer.emi_tenure, sorted.length);
+  const paidEmis = sorted.filter((e) => e.status === 'APPROVED').length;
+
+  const loanAmount = toNumber(
+    customer.disburse_amount,
+    toNumber(customer.purchase_value) - toNumber(customer.down_payment),
+  );
   const emiAmount = toNumber(customer.emi_amount);
-  const firstChargePaid = customer.first_emi_charge_paid_at ? toNumber(customer.first_emi_charge_amount) : 0;
 
-  const totalPaidFromEmi = sorted.reduce((acc, emi) => acc + toNumber(emi.partial_paid_amount), 0);
-  const totalPaid = totalPaidFromEmi + firstChargePaid;
+  const emiPrincipalPaid = sorted.reduce(
+    (acc, emi) => acc + emiPrincipalPaidForRow(emi, emiAmount),
+    0,
+  );
 
-  const remainingRows = sorted.filter(e => e.status !== 'APPROVED');
-  const emiRemaining = remainingRows.reduce((acc, emi) => {
-    const due = Math.max(0, toNumber(emi.amount) - toNumber(emi.partial_paid_amount));
-    return acc + due;
-  }, 0);
+  // Principal remaining is independent from fine/charges.
+  const emiRemaining = Math.max(0, loanAmount - Math.min(loanAmount, emiPrincipalPaid));
 
   const finePaid = sorted.reduce((acc, emi) => acc + toNumber(emi.fine_paid_amount), 0);
   const fineDueFromSchedule = sorted.reduce((acc, emi) => {
