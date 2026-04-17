@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient, createServiceClient } from '@/lib/supabase/server';
-import { applyApprovedRequestEffects, recomputeCustomerCompletion, reverseApprovedRequestEffects } from '@/lib/paymentReconcile';
+import { recomputeCustomerCompletion, recomputeCustomerLedgerFromRequests } from '@/lib/paymentReconcile';
 
 async function requireSuperAdmin() {
   const supabase = createClient();
@@ -33,7 +33,12 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
 
     if (fetchErr || !before) return NextResponse.json({ ok: false, error: 'Payment request not found' }, { status: 404 });
 
-    const body = await req.json().catch(() => ({}));
+    let body: any = {};
+    try {
+      body = await req.json();
+    } catch {
+      body = {};
+    }
     const nextStatus = String(body.status ?? before.status);
     const nextPaidAt = normalizePaidAt(body.paid_at, before.approved_at || null);
 
@@ -61,22 +66,13 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
       updates.approved_by = null;
     }
 
-    if (before.status === 'APPROVED') {
-      await reverseApprovedRequestEffects(svc, before);
-    }
-
     const { error: updateErr } = await svc.from('payment_requests').update(updates).eq('id', paymentId);
     if (updateErr) {
-      if (before.status === 'APPROVED') {
-        await applyApprovedRequestEffects(svc, before, before.approved_by, before.approved_at);
-      }
       return NextResponse.json({ ok: false, error: updateErr.message }, { status: 500 });
     }
 
     const after = { ...before, ...updates };
-    if (nextStatus === 'APPROVED') {
-      await applyApprovedRequestEffects(svc, after, user.id, String(after.approved_at));
-    }
+    await recomputeCustomerLedgerFromRequests(svc, before.customer_id);
     await recomputeCustomerCompletion(svc, before.customer_id);
 
     const { error: patchAuditErr } = await svc.from('audit_log').insert({
@@ -114,19 +110,13 @@ export async function DELETE(_req: NextRequest, { params }: { params: { id: stri
 
     if (fetchErr || !before) return NextResponse.json({ ok: false, error: 'Payment request not found' }, { status: 404 });
 
-    if (before.status === 'APPROVED') {
-      await reverseApprovedRequestEffects(svc, before);
-      await recomputeCustomerCompletion(svc, before.customer_id);
-    }
-
     const { error: deleteErr } = await svc.from('payment_requests').delete().eq('id', paymentId);
     if (deleteErr) {
-      if (before.status === 'APPROVED') {
-        await applyApprovedRequestEffects(svc, before, before.approved_by, before.approved_at);
-        await recomputeCustomerCompletion(svc, before.customer_id);
-      }
       return NextResponse.json({ ok: false, error: deleteErr.message }, { status: 500 });
     }
+
+    await recomputeCustomerLedgerFromRequests(svc, before.customer_id);
+    await recomputeCustomerCompletion(svc, before.customer_id);
 
     const { error: deleteAuditErr } = await svc.from('audit_log').insert({
       actor_user_id: user.id,

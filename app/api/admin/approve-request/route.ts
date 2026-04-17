@@ -11,7 +11,12 @@ export async function POST(req: NextRequest) {
     const { data: profile } = await supabase.from('profiles').select('role').eq('user_id', user.id).single();
     if (profile?.role !== 'super_admin') return NextResponse.json({ ok: false, error: 'Forbidden — admins only' }, { status: 403 });
 
-    const body = await req.json().catch(() => ({}));
+    let body: any = {};
+    try {
+      body = await req.json();
+    } catch {
+      body = {};
+    }
     const { request_id, remark } = body as { request_id?: string; remark?: string };
     if (!request_id) return NextResponse.json({ ok: false, error: 'request_id is required' }, { status: 400 });
 
@@ -28,7 +33,7 @@ export async function POST(req: NextRequest) {
     }).eq('id', request_id);
     if (reqErr) return NextResponse.json({ ok: false, error: reqErr.message }, { status: 500 });
 
-    await applyApprovedRequestEffects(svc, { ...request, status: 'APPROVED', approved_by: user.id, approved_at: now, notes }, user.id, now);
+    await applyApprovedRequestEffects(svc, { ...request, status: 'APPROVED', approved_by: user.id, approved_at: now, notes });
     await recomputeCustomerCompletion(svc, request.customer_id);
 
     const { error: auditErr } = await svc.from('audit_log').insert({

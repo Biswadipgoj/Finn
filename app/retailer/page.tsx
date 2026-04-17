@@ -382,8 +382,6 @@ export default function RetailerDashboard() {
             )}
 
             <CustomerDetailPanel customer={selectedCustomer} paidCount={paidCount} totalEmis={selectedCustomer.emi_tenure} />
-            <PaymentSummaryCard customer={selectedCustomer} emis={customerEmis} breakdown={breakdown} />
-
             {breakdown && (() => {
               const daysLeft = breakdown.next_emi_due_date ? differenceInDays(new Date(breakdown.next_emi_due_date), new Date()) : null;
               return (
@@ -423,7 +421,7 @@ export default function RetailerDashboard() {
                   ? `💳 Collect EMI #${breakdown.next_emi_no}`
                   : '💳 Collect Payment';
               return (
-                <div className="sticky bottom-[4.75rem] sm:bottom-0 z-30">
+                <div className="pt-1">
                   <button
                     onClick={() => setShowPaymentModal(true)}
                     disabled={!hasUnpaidEmis}
@@ -441,6 +439,7 @@ export default function RetailerDashboard() {
             )}
 
             <EMIScheduleTable emis={customerEmis} nextUnpaidNo={breakdown?.next_emi_no ?? undefined} isAdmin={false} />
+            <PaymentSummaryCard customer={selectedCustomer} emis={customerEmis} breakdown={breakdown} />
           </div>
         )}
       </div>

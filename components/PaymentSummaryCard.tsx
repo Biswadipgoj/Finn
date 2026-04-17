@@ -120,20 +120,6 @@ export default function PaymentSummaryCard({
     : 0;
   const nextDueDate = nextEmi?.due_date ?? breakdown?.next_emi_due_date ?? null;
 
-  // Temporary debug helper for validating source-of-truth math; not rendered in UI.
-  if (process.env.NODE_ENV !== 'production') {
-    console.debug('[PaymentSummaryCard:debug]', {
-      customerId: customer.id,
-      totalEmiPrincipal: debugSummary.totalEmiPrincipal,
-      totalEmiPrincipalPaid: debugSummary.totalEmiPrincipalPaid,
-      totalFinePaid: debugSummary.totalFinePaid,
-      totalFineDue: debugSummary.totalFineDue,
-      nextOutstandingEmi: debugSummary.nextOutstandingEmi
-        ? { emi_no: debugSummary.nextOutstandingEmi.emi_no, due_date: debugSummary.nextOutstandingEmi.due_date }
-        : null,
-    });
-  }
-
   const rows = [
     { label: 'Loan Amount', value: formatCurrency(loanAmount) },
     { label: 'EMI Amount', value: formatCurrency(emiAmount) },
@@ -144,7 +130,7 @@ export default function PaymentSummaryCard({
     { label: 'Fine Paid', value: formatCurrency(finePaid) },
     { label: 'Fine Due', value: formatCurrency(effectiveFineDue) },
     { label: 'Total Remaining', value: formatCurrency(totalRemaining) },
-    { label: 'Next EMI Due', value: formatCurrency(breakdown?.next_emi_amount ?? nextEmiDue) },
+    { label: 'Next EMI Due', value: formatCurrency(nextEmi ? nextEmiDue : (breakdown?.next_emi_amount ?? 0)) },
     { label: 'Next Due Date', value: formatDateOnly(nextDueDate) },
     { label: 'Status', value: statusLabel(customer) },
   ];
@@ -153,14 +139,14 @@ export default function PaymentSummaryCard({
     <section className="card overflow-hidden">
       <header className="px-5 py-4 border-b border-surface-4 bg-surface-2">
         <h3 className="text-lg font-bold text-ink">Payment Summary</h3>
-        <p className="text-xs text-ink-muted mt-0.5">Current statement view</p>
+        <p className="text-xs text-ink-muted mt-0.5">Live reconciled totals</p>
       </header>
 
       <div className="grid grid-cols-1 md:grid-cols-2 md:gap-x-6 px-4 md:px-5">
         {rows.map((row, idx) => (
           <div
             key={row.label}
-            className={`flex items-center justify-between gap-4 py-3 ${idx !== rows.length - 1 ? 'border-b border-surface-4' : ''}`}
+            className={`flex items-center justify-between gap-4 py-2.5 ${idx !== rows.length - 1 ? 'border-b border-surface-4' : ''}`}
           >
             <p className="text-sm font-medium text-ink-muted">{row.label}</p>
             <p className="text-sm sm:text-base font-bold text-ink text-right num">{row.value}</p>
