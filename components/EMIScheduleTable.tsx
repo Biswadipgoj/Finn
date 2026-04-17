@@ -26,7 +26,7 @@ function statusBadge(status: EMISchedule['status'], isOverdue: boolean) {
 }
 
 function formatDateTime(value?: string | null) {
-  if (!value) return '—';
+  if (!value) return '-';
   return format(new Date(value), 'dd MMM yyyy, hh:mm a');
 }
 
@@ -161,7 +161,7 @@ export default function EMIScheduleTable({ emis, isAdmin, nextUnpaidNo, onRefres
                     <KvRow label="EMI Amount" value={fmt(emi.amount)} emphasize />
                     <KvRow label="Due Date" value={format(dueDate, 'dd MMM yyyy')} />
                     <KvRow label="EMI Paid Amount" value={fmt(emiPaidAmount)} />
-                    <KvRow label="EMI Paid Date" value={emi.paid_at ? formatDateTime(emi.paid_at) : emi.partial_paid_at ? formatDateTime(emi.partial_paid_at) : '—'} />
+                    <KvRow label="EMI Paid Date" value={emi.paid_at ? formatDateTime(emi.paid_at) : emi.partial_paid_at ? formatDateTime(emi.partial_paid_at) : '-'} />
                     <KvRow label="Remaining EMI" value={fmt(emiRemaining)} />
                   </div>
                   <div className="space-y-0 md:border-l md:border-surface-3 md:pl-8">
@@ -169,7 +169,7 @@ export default function EMIScheduleTable({ emis, isAdmin, nextUnpaidNo, onRefres
                     <KvRow label="Fine Paid Amount" value={fmt(finePaidAmount)} />
                     <KvRow label="Fine Paid Date" value={formatDateTime(emi.fine_paid_at)} />
                     <KvRow label="Remaining Fine" value={fmt(fineRemaining)} />
-                    <KvRow label="Mode" value={emi.mode || '—'} />
+                    <KvRow label="Mode" value={emi.mode || '-'} />
                   </div>
                 </div>
 

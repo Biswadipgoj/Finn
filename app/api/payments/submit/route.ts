@@ -3,7 +3,12 @@ import { createClient, createServiceClient } from '@/lib/supabase/server';
 
 export async function POST(req: NextRequest) {
   try {
-    const body = await req.json().catch(() => ({}));
+    let body: any = {};
+    try {
+      body = await req.json();
+    } catch {
+      body = {};
+    }
     const { customer_id, emi_ids, emi_nos, mode, utr, notes, retail_pin, total_emi_amount, scheduled_emi_amount, fine_amount, first_emi_charge_amount, total_amount, fine_for_emi_no, fine_due_date, collected_by_role, collect_type } = body;
     const noEmi = collect_type === 'fine_only' || collect_type === 'first_charge_only';
     if (!customer_id || (!noEmi && !emi_ids?.length) || !mode) return NextResponse.json({ ok: false, error: 'Missing required fields' }, { status: 400 });

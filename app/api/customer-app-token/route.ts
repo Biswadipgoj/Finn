@@ -66,7 +66,10 @@ export async function GET(req: NextRequest) {
     .select('id, emi_no, due_date, amount, status, paid_at, mode, partial_paid_amount, partial_paid_at, fine_amount, fine_waived, fine_paid_amount, fine_paid_at')
     .eq('customer_id', customer.id).order('emi_no');
 
-  const { data: breakdown } = await svc.rpc('get_due_breakdown', { p_customer_id: customer.id }).catch(() => ({ data: null }));
+  const { data: breakdown, error: breakdownErr } = await svc.rpc('get_due_breakdown', { p_customer_id: customer.id });
+  if (breakdownErr) {
+    console.warn('customer-app-token breakdown rpc failed', breakdownErr.message);
+  }
 
   const { data: broadcasts } = await svc.from('broadcast_messages')
     .select('id, message, image_url, expires_at, sender_name, sender_role')
