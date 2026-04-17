@@ -18,6 +18,27 @@ interface Props {
 
 const fmt = formatCurrency;
 
+function statusBadge(status: EMISchedule['status'], isOverdue: boolean) {
+  if (status === 'APPROVED') return <span className="badge-green">Paid</span>;
+  if (status === 'PARTIALLY_PAID') return <span className="badge-yellow">Partially Paid</span>;
+  if (status === 'PENDING_APPROVAL') return <span className="badge-yellow">Pending</span>;
+  return <span className={`badge ${isOverdue ? 'badge-red' : 'badge-gray'}`}>{isOverdue ? 'Overdue' : 'Unpaid'}</span>;
+}
+
+function formatDateTime(value?: string | null) {
+  if (!value) return '—';
+  return format(new Date(value), 'dd MMM yyyy, hh:mm a');
+}
+
+function KvRow({ label, value, emphasize = false }: { label: string; value: string; emphasize?: boolean }) {
+  return (
+    <div className="flex items-center justify-between gap-3 py-1.5">
+      <span className="text-xs font-medium text-ink-muted">{label}</span>
+      <span className={`text-sm text-right num ${emphasize ? 'font-bold text-ink' : 'font-semibold text-ink'}`}>{value}</span>
+    </div>
+  );
+}
+
 export default function EMIScheduleTable({ emis, isAdmin, nextUnpaidNo, onRefresh, defaultFineAmount = 450 }: Props) {
   const supabase = createClient();
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -36,182 +57,132 @@ export default function EMIScheduleTable({ emis, isAdmin, nextUnpaidNo, onRefres
     const { error } = await supabase.from('emi_schedule').update(updates).eq('id', emi.id);
     setSaving(false);
     if (error) toast.error(error.message);
-    else { toast.success('EMI updated'); setEditingId(null); onRefresh?.(); }
+    else {
+      toast.success('EMI updated');
+      setEditingId(null);
+      onRefresh?.();
+    }
   }
 
   return (
-    <div className="card overflow-hidden">
-      <div className="flex items-center justify-between px-5 py-3 border-b border-surface-4 bg-surface-2">
-        <p className="text-xs font-bold text-ink-muted uppercase tracking-widest">EMI Schedule</p>
+    <section className="card overflow-hidden">
+      <header className="flex items-center justify-between px-5 py-4 border-b border-surface-4 bg-surface-2">
+        <div>
+          <h3 className="text-lg font-bold text-ink">EMI Schedule</h3>
+          <p className="text-xs text-ink-muted mt-0.5">Installment-wise collection and fine status</p>
+        </div>
         <div className="flex gap-2 text-xs">
           <span className="badge-green">{paidCount} paid</span>
           <span className="badge-gray">{sortedEmis.length} total</span>
         </div>
-      </div>
+      </header>
 
-      <div className="hidden md:block overflow-x-auto">
-        <table className="tbl">
-          <thead>
-            <tr>
-              <th>#</th>
-              <th>Due Date</th>
-              <th>Amount</th>
-              <th>Fine</th>
-              <th>Status</th>
-              <th>Paid On</th>
-              <th>Mode</th>
-              {isAdmin && <th className="text-right">Actions</th>}
-            </tr>
-          </thead>
-          <tbody>
-            {sortedEmis.map(emi => {
-              const today = new Date();
-              const dueDate = new Date(emi.due_date);
-              const isOverdue = ['UNPAID', 'PARTIALLY_PAID'].includes(emi.status) && dueDate < today;
-              const isNext = emi.emi_no === nextUnpaidNo;
-              const editing = editingId === emi.id;
-
-              // Fine: show fine_amount if set, else default if overdue
-              const maxEmiNo = sortedEmis.length > 0 ? Math.max(...sortedEmis.map(e => e.emi_no)) : 0;
-              const isLastEmi = emi.emi_no === maxEmiNo; // position-based, not status-based
-              const autoFine = isOverdue ? calculateSingleEmiFine(emi.due_date, isLastEmi, defaultFineAmount) : 0;
-              const displayFine = Math.max(autoFine, emi.fine_amount || 0);
-              const emiPaidAmount = Math.max(0, Number(emi.partial_paid_amount || 0));
-              const emiRemaining = Math.max(0, Number(emi.amount || 0) - emiPaidAmount);
-              const finePaid = emi.fine_paid_amount || 0;
-              const fineRemaining = Math.max(0, displayFine - finePaid);
-
-              // Fine start date = due_date + 1 day
-              const fineStartDate = addDays(dueDate, 1);
-              const overdueDays = isOverdue ? differenceInDays(today, dueDate) : 0;
-
-              return (
-                <tr key={emi.id} className={isOverdue ? 'bg-danger-light/30' : isNext ? 'bg-brand-50/50' : ''}>
-                  <td className="font-semibold text-ink">
-                    #{emi.emi_no}
-                    {isNext && <span className="ml-1 text-[9px] bg-success-light text-success border border-success-border px-1 py-0.5 rounded-full">NEXT</span>}
-                  </td>
-                  <td>
-                    {editing ? (
-                      <input type="date" value={dateOverride || emi.due_date}
-                        onChange={e => setDateOverride(e.target.value)}
-                        className="input py-1 px-2 text-xs w-36" />
-                    ) : (
-                      <div>
-                        <span className={`num text-sm ${isOverdue ? 'text-danger font-medium' : ''}`}>
-                          {format(dueDate, 'd MMM yyyy')}
-                          {isOverdue && ' \u26A0'}
-                        </span>
-                        {isOverdue && (
-                          <p className="text-[10px] text-danger mt-0.5">
-                            Overdue by {overdueDays} day{overdueDays !== 1 ? 's' : ''}
-                          </p>
-                        )}
-                      </div>
-                    )}
-                  </td>
-                  <td className="num font-medium">
-                    <div>{fmt(emi.amount)}</div>
-                    {emi.status === 'PARTIALLY_PAID' && <div className="text-[10px] text-warning mt-0.5">Remaining: {fmt(emiRemaining)}</div>}
-                  </td>
-                  <td>
-                    {editing ? (
-                      <input type="number" value={fineOverride}
-                        onChange={e => setFineOverride(e.target.value)}
-                        placeholder={String(emi.fine_amount || 0)}
-                        className="input py-1 px-2 text-xs w-24" />
-                    ) : displayFine > 0 ? (
-                      <div>
-                        <span className="num text-xs font-semibold text-danger">{fmt(fineRemaining > 0 ? fineRemaining : displayFine)}</span>
-                        {finePaid > 0 && <p className="text-[10px] text-success mt-0.5">Paid: {fmt(finePaid)}{emi.fine_paid_at ? ` (${new Date(emi.fine_paid_at).toLocaleDateString('en-IN', {day:'numeric',month:'short'})})` : ''}</p>}
-                        {isOverdue && (
-                          <p className="text-[10px] text-danger/70 mt-0.5">
-                            From {format(fineStartDate, 'd MMM')}
-                          </p>
-                        )}
-                      </div>
-                    ) : (
-                      <span className="text-ink-muted text-xs">{'\u2014'}</span>
-                    )}
-                  </td>
-                  <td>
-                    {emi.status === 'APPROVED' && <span className="badge-blue">✓ Paid</span>}
-                    {emi.status === 'PARTIALLY_PAID' && <span className="badge-yellow">Partial</span>}
-                    {emi.status === 'PENDING_APPROVAL' && <span className="badge-yellow">⏳ Pending</span>}
-                    {emi.status === 'UNPAID' && <span className={`badge ${isOverdue ? 'badge-red' : 'badge-gray'}`}>{isOverdue ? 'Overdue' : 'Unpaid'}</span>}
-                  </td>
-                  <td className="num text-xs text-ink-muted">
-                    {emi.paid_at ? format(new Date(emi.paid_at), 'd MMM yy') : emi.partial_paid_at ? `${format(new Date(emi.partial_paid_at), 'd MMM yy')} (partial)` : '—'}
-                  </td>
-                  <td className="text-xs text-ink-muted">{emi.mode || '\u2014'}</td>
-                  {isAdmin && (
-                    <td className="text-right">
-                      {editing ? (
-                        <div className="flex items-center gap-1 justify-end">
-                          <button onClick={() => saveEdit(emi)} disabled={saving} className="btn-success text-xs px-2 py-1">
-                            {saving ? '\u2026' : 'Save'}
-                          </button>
-                          <button onClick={() => setEditingId(null)} className="btn-secondary text-xs px-2 py-1">Cancel</button>
-                        </div>
-                      ) : (
-                        <div className="flex items-center gap-1 justify-end">
-                          {emi.status === 'UNPAID' && (
-                            <button
-                              onClick={() => { setEditingId(emi.id); setFineOverride(''); setDateOverride(''); }}
-                              className="btn-ghost text-xs px-2 py-1"
-                            >{'\u270F'}</button>
-                          )}
-                        </div>
-                      )}
-                    </td>
-                  )}
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
-      <div className="md:hidden divide-y divide-surface-3">
-        {sortedEmis.map(emi => {
+      <div className="p-3 sm:p-4 space-y-3 sm:space-y-4">
+        {sortedEmis.map((emi) => {
           const today = new Date();
           const dueDate = new Date(emi.due_date);
           const isOverdue = ['UNPAID', 'PARTIALLY_PAID'].includes(emi.status) && dueDate < today;
           const isNext = emi.emi_no === nextUnpaidNo;
-          const maxEmiNo = sortedEmis.length > 0 ? Math.max(...sortedEmis.map(e => e.emi_no)) : 0;
+          const editing = editingId === emi.id;
+
+          const maxEmiNo = sortedEmis.length > 0 ? Math.max(...sortedEmis.map((e) => e.emi_no)) : 0;
           const isLastEmi = emi.emi_no === maxEmiNo;
           const autoFine = isOverdue ? calculateSingleEmiFine(emi.due_date, isLastEmi, defaultFineAmount) : 0;
           const displayFine = Math.max(autoFine, emi.fine_amount || 0);
+
           const emiPaidAmount = Math.max(0, Number(emi.partial_paid_amount || 0));
           const emiRemaining = Math.max(0, Number(emi.amount || 0) - emiPaidAmount);
-          const fineRemaining = Math.max(0, displayFine - Number(emi.fine_paid_amount || 0));
-          const hasFine = displayFine > 0;
+          const finePaidAmount = Math.max(0, Number(emi.fine_paid_amount || 0));
+          const fineRemaining = Math.max(0, displayFine - finePaidAmount);
+
+          const fineStartDate = addDays(dueDate, 1);
+          const overdueDays = isOverdue ? differenceInDays(today, dueDate) : 0;
+
           return (
-            <div key={emi.id} className={`p-4 space-y-2 ${isOverdue ? 'bg-danger-light/40' : isNext ? 'bg-brand-50/50' : ''}`}>
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="font-semibold text-ink">EMI #{emi.emi_no}</p>
-                  <p className={`text-[11px] ${isOverdue ? 'text-danger' : 'text-ink-muted'}`}>{format(dueDate, 'd MMM yyyy')}</p>
+            <article
+              key={emi.id}
+              className={`rounded-xl border ${isOverdue ? 'border-danger-border bg-danger-light/20' : 'border-surface-4 bg-white'}`}
+            >
+              <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-3 border-b border-surface-4">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <p className="text-sm font-bold text-ink">EMI #{emi.emi_no}</p>
+                  {statusBadge(emi.status, isOverdue)}
+                  {isNext && <span className="badge-blue">Next Due</span>}
                 </div>
-                {emi.status === 'APPROVED' && <span className="badge-blue">✓ Paid</span>}
-                {emi.status === 'PARTIALLY_PAID' && <span className="badge-yellow">Partial</span>}
-                {emi.status === 'PENDING_APPROVAL' && <span className="badge-yellow">⏳ Pending</span>}
-                {emi.status === 'UNPAID' && <span className={`badge ${isOverdue ? 'badge-red' : 'badge-gray'}`}>{isOverdue ? 'Overdue' : 'Unpaid'}</span>}
-              </div>
-              <div className="grid grid-cols-2 gap-2 text-xs">
-                <p className="text-ink-muted">Amount</p><p className="text-right num">{fmt(emi.amount)}</p>
-                {emi.status === 'PARTIALLY_PAID' && <><p className="text-ink-muted">EMI Paid</p><p className="text-right num text-success">{fmt(emiPaidAmount)}</p><p className="text-ink-muted">EMI Remaining</p><p className="text-right num text-warning">{fmt(emiRemaining)}</p></>}
-                {hasFine && (
-                  <>
-                    <p className="text-ink-muted">Fine</p><p className="text-right num">{fmt(fineRemaining > 0 ? fineRemaining : displayFine)}</p>
-                    <p className="text-ink-muted">Fine Status</p><p className="text-right">{Number(emi.fine_paid_amount || 0) > 0 && fineRemaining > 0 ? 'Partially paid' : fineRemaining === 0 ? 'Paid' : 'Due'}</p>
-                  </>
+
+                {isAdmin && (
+                  <div className="flex items-center gap-1.5">
+                    {editing ? (
+                      <>
+                        <button onClick={() => saveEdit(emi)} disabled={saving} className="btn-success text-xs px-2 py-1">
+                          {saving ? '…' : 'Save'}
+                        </button>
+                        <button onClick={() => setEditingId(null)} className="btn-secondary text-xs px-2 py-1">Cancel</button>
+                      </>
+                    ) : (
+                      emi.status === 'UNPAID' && (
+                        <button
+                          onClick={() => {
+                            setEditingId(emi.id);
+                            setFineOverride('');
+                            setDateOverride('');
+                          }}
+                          className="btn-ghost text-xs px-2 py-1"
+                        >
+                          Edit
+                        </button>
+                      )
+                    )}
+                  </div>
                 )}
-                <p className="text-ink-muted">Paid On</p><p className="text-right num">{emi.paid_at ? format(new Date(emi.paid_at), 'd MMM yy') : emi.partial_paid_at ? `${format(new Date(emi.partial_paid_at), 'd MMM yy')} (partial)` : '—'}</p>
               </div>
-            </div>
+
+              <div className="px-4 py-3">
+                {editing && (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-3 pb-3 border-b border-surface-4">
+                    <input
+                      type="date"
+                      value={dateOverride || emi.due_date}
+                      onChange={e => setDateOverride(e.target.value)}
+                      className="input py-2 text-sm"
+                    />
+                    <input
+                      type="number"
+                      value={fineOverride}
+                      onChange={e => setFineOverride(e.target.value)}
+                      placeholder={String(emi.fine_amount || 0)}
+                      className="input py-2 text-sm"
+                    />
+                  </div>
+                )}
+
+                <div className="grid grid-cols-1 md:grid-cols-2 md:gap-x-8 gap-y-0 divide-y md:divide-y-0 divide-surface-3">
+                  <div className="space-y-0">
+                    <KvRow label="EMI Amount" value={fmt(emi.amount)} emphasize />
+                    <KvRow label="Due Date" value={format(dueDate, 'dd MMM yyyy')} />
+                    <KvRow label="EMI Paid Amount" value={fmt(emiPaidAmount)} />
+                    <KvRow label="EMI Paid Date" value={emi.paid_at ? formatDateTime(emi.paid_at) : emi.partial_paid_at ? formatDateTime(emi.partial_paid_at) : '—'} />
+                    <KvRow label="Remaining EMI" value={fmt(emiRemaining)} />
+                  </div>
+                  <div className="space-y-0 md:border-l md:border-surface-3 md:pl-8">
+                    <KvRow label="Fine Amount" value={fmt(displayFine)} emphasize={displayFine > 0} />
+                    <KvRow label="Fine Paid Amount" value={fmt(finePaidAmount)} />
+                    <KvRow label="Fine Paid Date" value={formatDateTime(emi.fine_paid_at)} />
+                    <KvRow label="Remaining Fine" value={fmt(fineRemaining)} />
+                    <KvRow label="Mode" value={emi.mode || '—'} />
+                  </div>
+                </div>
+
+                {isOverdue && (
+                  <p className="text-xs text-danger mt-2.5">
+                    Overdue by {overdueDays} day{overdueDays === 1 ? '' : 's'} · Fine from {format(fineStartDate, 'dd MMM yyyy')}
+                  </p>
+                )}
+              </div>
+            </article>
           );
         })}
       </div>
-    </div>
+    </section>
   );
 }

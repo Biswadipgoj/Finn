@@ -38,13 +38,14 @@ export default function PaymentSummaryCard({
   }, 0);
 
   const finePaid = sorted.reduce((acc, emi) => acc + toNumber(emi.fine_paid_amount), 0);
-  const fineDue = sorted.reduce((acc, emi) => {
+  const fineDueFromSchedule = sorted.reduce((acc, emi) => {
     if (emi.fine_waived) return acc;
     const due = Math.max(0, toNumber(emi.fine_amount) - toNumber(emi.fine_paid_amount));
     return acc + due;
   }, 0);
 
-  const totalRemaining = emiRemaining + fineDue;
+  const effectiveFineDue = Math.max(0, toNumber(breakdown?.fine_due, fineDueFromSchedule));
+  const totalRemaining = emiRemaining + effectiveFineDue;
   const nextEmi = sorted.find(e => e.status === 'UNPAID' || e.status === 'PARTIALLY_PAID');
   const nextEmiDue = Math.max(0, toNumber(nextEmi?.amount) - toNumber(nextEmi?.partial_paid_amount));
 
@@ -56,7 +57,7 @@ export default function PaymentSummaryCard({
     { label: 'Total Paid', value: formatCurrency(totalPaid) },
     { label: 'EMI Remaining', value: formatCurrency(emiRemaining) },
     { label: 'Fine Paid', value: formatCurrency(finePaid) },
-    { label: 'Fine Due', value: formatCurrency(breakdown?.fine_due ?? fineDue) },
+    { label: 'Fine Due', value: formatCurrency(effectiveFineDue) },
     { label: 'Total Remaining', value: formatCurrency(totalRemaining) },
     { label: 'Next EMI Due', value: formatCurrency(breakdown?.next_emi_amount ?? nextEmiDue) },
     { label: 'Next Due Date', value: formatDateOnly(breakdown?.next_emi_due_date ?? nextEmi?.due_date ?? null) },
@@ -64,19 +65,23 @@ export default function PaymentSummaryCard({
   ];
 
   return (
-    <div className="card p-4 sm:p-5">
-      <div className="flex items-center justify-between mb-3">
-        <h3 className="text-base sm:text-lg font-bold text-ink">Payment Summary</h3>
-        <span className="text-xs font-semibold text-ink-muted">Live snapshot</span>
-      </div>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-2 sm:gap-3">
-        {rows.map(row => (
-          <div key={row.label} className="rounded-xl border border-surface-4 bg-surface-2 px-3 py-2.5">
-            <p className="text-[11px] font-semibold text-ink-muted">{row.label}</p>
-            <p className="text-sm sm:text-base font-bold text-ink mt-0.5">{row.value}</p>
+    <section className="card overflow-hidden">
+      <header className="px-5 py-4 border-b border-surface-4 bg-surface-2">
+        <h3 className="text-lg font-bold text-ink">Payment Summary</h3>
+        <p className="text-xs text-ink-muted mt-0.5">Current statement view</p>
+      </header>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 md:gap-x-6 px-4 md:px-5">
+        {rows.map((row, idx) => (
+          <div
+            key={row.label}
+            className={`flex items-center justify-between gap-4 py-3 ${idx !== rows.length - 1 ? 'border-b border-surface-4' : ''}`}
+          >
+            <p className="text-sm font-medium text-ink-muted">{row.label}</p>
+            <p className="text-sm sm:text-base font-bold text-ink text-right num">{row.value}</p>
           </div>
         ))}
       </div>
-    </div>
+    </section>
   );
 }

@@ -15,35 +15,39 @@ export default function DueBreakdownPanel({ breakdown }: { breakdown: DueBreakdo
     : 0;
 
   return (
-    <div className="card p-5 border-l-4 border-brand-400 bg-brand-50/50">
-      <p className="text-xs font-bold text-ink-muted uppercase tracking-widest mb-4">Next Payment Due</p>
+    <section className="card p-5 border border-surface-4 bg-white">
+      <header className="mb-3.5">
+        <h3 className="text-base font-bold text-ink">Next Payment Due</h3>
+        <p className="text-xs text-ink-muted mt-0.5">Breakdown of the current payable amount</p>
+      </header>
+
       <div className="space-y-2.5">
         {(breakdown.selected_emi_amount ?? breakdown.next_emi_amount ?? 0) > 0 && (
           <Row label={`EMI #${breakdown.next_emi_no}`} value={fmt(breakdown.selected_emi_amount ?? breakdown.next_emi_amount ?? 0)} />
         )}
         {breakdown.first_emi_charge_due > 0 && (
-          <Row label="1st EMI Charge ⭐" value={fmt(breakdown.first_emi_charge_due)} accent="warning" />
+          <Row label="First EMI Charge" value={fmt(breakdown.first_emi_charge_due)} accent="warning" />
         )}
         {breakdown.fine_due > 0 && (
           <div>
-            <Row label="Late Fine ⚠️" value={fmt(breakdown.fine_due)} accent="danger" />
+            <Row label="Late Fine" value={fmt(breakdown.fine_due)} accent="danger" />
             {fineStartDate && (
               <p className="text-[11px] text-danger/70 mt-0.5 ml-0.5">
-                Fine from: {format(fineStartDate, 'd MMM yyyy')}
+                Fine applied from {format(fineStartDate, 'd MMM yyyy')}
               </p>
             )}
           </div>
         )}
         <div className="h-px bg-surface-4 my-1" />
         <div className="flex justify-between items-center">
-          <span className="font-bold text-ink text-base">Total Payable</span>
-          <span className="num font-bold text-2xl text-brand-600">{fmt(breakdown.total_payable)}</span>
+          <span className="font-semibold text-ink">Total Payable</span>
+          <span className="num font-bold text-xl text-ink">{fmt(breakdown.total_payable)}</span>
         </div>
         {dueDate && (
           <div className="space-y-0.5">
             <p className={`text-xs ${breakdown.is_overdue ? 'text-danger font-medium' : 'text-ink-muted'}`}>
-              Due: {format(dueDate, 'd MMMM yyyy')}
-              {breakdown.is_overdue && ` — OVERDUE`}
+              Due Date: {format(dueDate, 'd MMMM yyyy')}
+              {breakdown.is_overdue && ' (Overdue)'}
             </p>
             {overdueDays > 0 && (
               <p className="text-xs text-danger">
@@ -53,7 +57,7 @@ export default function DueBreakdownPanel({ breakdown }: { breakdown: DueBreakdo
           </div>
         )}
       </div>
-    </div>
+    </section>
   );
 }
 
@@ -62,7 +66,7 @@ function Row({ label, value, accent }: { label: string; value: string; accent?: 
   return (
     <div className="flex justify-between text-sm">
       <span className={accent ? cls : 'text-ink-muted'}>{label}</span>
-      <span className={`num font-medium ${cls}`}>{value}</span>
+      <span className={`num font-semibold ${cls}`}>{value}</span>
     </div>
   );
 }
