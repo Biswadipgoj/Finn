@@ -121,19 +121,26 @@ export default function PaymentSummaryCard({
   const nextDueDate = nextEmi?.due_date ?? breakdown?.next_emi_due_date ?? null;
 
   const rows = [
-    { label: 'Loan Amount', value: formatCurrency(loanAmount) },
-    { label: 'EMI Amount', value: formatCurrency(emiAmount) },
-    { label: 'Total EMIs', value: String(totalEmis || 0) },
-    { label: 'Paid EMIs', value: String(paidEmis || 0) },
-    { label: 'Total Paid', value: formatCurrency(totalPaid) },
-    { label: 'EMI Remaining', value: formatCurrency(emiRemaining) },
-    { label: 'Fine Paid', value: formatCurrency(finePaid) },
-    { label: 'Fine Due', value: formatCurrency(effectiveFineDue) },
-    { label: 'Total Remaining', value: formatCurrency(totalRemaining) },
-    { label: 'Next EMI Due', value: formatCurrency(nextEmi ? nextEmiDue : (breakdown?.next_emi_amount ?? 0)) },
-    { label: 'Next Due Date', value: formatDateOnly(nextDueDate) },
-    { label: 'Status', value: statusLabel(customer) },
+    { label: 'Loan Amount', value: formatCurrency(loanAmount), tone: 'neutral' },
+    { label: 'EMI Amount', value: formatCurrency(emiAmount), tone: 'neutral' },
+    { label: 'Total EMIs', value: String(totalEmis || 0), tone: 'neutral' },
+    { label: 'Paid EMIs', value: String(paidEmis || 0), tone: 'success' },
+    { label: 'Total Paid', value: formatCurrency(totalPaid), tone: 'success' },
+    { label: 'EMI Remaining', value: formatCurrency(emiRemaining), tone: emiRemaining > 0 ? 'info' : 'success' },
+    { label: 'Fine Paid', value: formatCurrency(finePaid), tone: finePaid > 0 ? 'success' : 'neutral' },
+    { label: 'Fine Due', value: formatCurrency(effectiveFineDue), tone: effectiveFineDue > 0 ? 'danger' : 'success' },
+    { label: 'Total Remaining', value: formatCurrency(totalRemaining), tone: totalRemaining > 0 ? 'info' : 'success' },
+    { label: 'Next EMI Due', value: formatCurrency(nextEmi ? nextEmiDue : (breakdown?.next_emi_amount ?? 0)), tone: 'info' },
+    { label: 'Next Due Date', value: formatDateOnly(nextDueDate), tone: 'neutral' },
+    { label: 'Status', value: statusLabel(customer), tone: 'neutral' },
   ];
+
+  const toneClasses: Record<string, string> = {
+    neutral: 'border-surface-4 bg-white text-ink',
+    success: 'border-success-border bg-success-light/40 text-success',
+    danger: 'border-danger-border bg-danger-light/35 text-danger',
+    info: 'border-brand-200 bg-brand-50/45 text-brand-700',
+  };
 
   return (
     <section className="card overflow-hidden">
@@ -142,14 +149,14 @@ export default function PaymentSummaryCard({
         <p className="text-xs text-ink-muted mt-0.5">Live reconciled totals</p>
       </header>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 md:gap-x-6 px-4 md:px-5">
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-2.5 p-4">
         {rows.map((row, idx) => (
           <div
             key={row.label}
-            className={`flex items-center justify-between gap-4 py-2.5 ${idx !== rows.length - 1 ? 'border-b border-surface-4' : ''}`}
+            className={`rounded-xl border px-3.5 py-3 shadow-sm ${toneClasses[row.tone]} ${idx === 8 ? 'sm:col-span-2 xl:col-span-1' : ''}`}
           >
-            <p className="text-sm font-medium text-ink-muted">{row.label}</p>
-            <p className="text-sm sm:text-base font-bold text-ink text-right num">{row.value}</p>
+            <p className="text-xs font-semibold uppercase tracking-wide opacity-80">{row.label}</p>
+            <p className="text-base font-bold text-right num mt-1">{row.value}</p>
           </div>
         ))}
       </div>

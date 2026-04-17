@@ -42,6 +42,35 @@ function statusBadge(status: EMISchedule['status'], isOverdue: boolean) {
   return <span className={`badge ${isOverdue ? 'badge-red' : 'badge-gray'}`}>{isOverdue ? 'Overdue' : 'Unpaid'}</span>;
 }
 
+function cardTheme(emi: EMISchedule, isOverdue: boolean) {
+  if (isOverdue) {
+    return {
+      wrapper: 'border-danger-border bg-danger-light/20',
+      accent: 'bg-danger',
+      value: 'text-danger',
+    };
+  }
+  if (emi.status === 'APPROVED') {
+    return {
+      wrapper: 'border-success-border bg-success-light/40',
+      accent: 'bg-success',
+      value: 'text-success',
+    };
+  }
+  if (emi.status === 'PARTIALLY_PAID' || emi.status === 'PENDING_APPROVAL') {
+    return {
+      wrapper: 'border-warning-border bg-warning-light/35',
+      accent: 'bg-warning',
+      value: 'text-warning',
+    };
+  }
+  return {
+    wrapper: 'border-brand-200 bg-brand-50/45',
+    accent: 'bg-brand-500',
+    value: 'text-brand-700',
+  };
+}
+
 function formatDateTime(value?: string | null) {
   if (!value) return '-';
   return format(new Date(value), 'dd MMM yyyy, hh:mm a');
@@ -153,13 +182,16 @@ export default function EMIScheduleTable({ emis, isAdmin, nextUnpaidNo, onRefres
         </div>
       </header>
 
-      <div className="p-3 sm:p-4 space-y-3 sm:space-y-4">
+      <div className="p-3 sm:p-4">
+        <div className="overflow-x-auto pb-1 -mx-1 px-1 [scrollbar-width:thin]">
+          <div className="flex gap-3 sm:gap-4 snap-x snap-mandatory md:grid md:grid-cols-2 xl:grid-cols-3 md:overflow-visible md:snap-none">
         {sortedEmis.map((emi) => {
           const today = new Date();
           const dueDate = new Date(emi.due_date);
           const isOverdue = ['UNPAID', 'PARTIALLY_PAID'].includes(emi.status) && dueDate < today;
           const isNext = emi.emi_no === nextUnpaidNo;
           const editing = editingId === emi.id;
+          const theme = cardTheme(emi, isOverdue);
 
           const maxEmiNo = sortedEmis.length > 0 ? Math.max(...sortedEmis.map((e) => e.emi_no)) : 0;
           const isLastEmi = emi.emi_no === maxEmiNo;
@@ -177,9 +209,10 @@ export default function EMIScheduleTable({ emis, isAdmin, nextUnpaidNo, onRefres
           return (
             <article
               key={emi.id}
-              className={`rounded-xl border ${isOverdue ? 'border-danger-border bg-danger-light/20' : 'border-surface-4 bg-white'}`}
+              className={`relative min-w-[240px] sm:min-w-[260px] md:min-w-0 rounded-2xl border shadow-sm snap-start ${theme.wrapper}`}
             >
-              <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-3 border-b border-surface-4">
+              <div className={`absolute left-0 top-0 h-full w-1.5 rounded-l-2xl ${theme.accent}`} />
+              <div className="flex flex-wrap items-center justify-between gap-2 pl-5 pr-4 py-3 border-b border-black/5">
                 <div className="flex items-center gap-2 flex-wrap">
                   <p className="text-sm font-bold text-ink">EMI #{emi.emi_no}</p>
                   {statusBadge(emi.status, isOverdue)}
@@ -210,7 +243,7 @@ export default function EMIScheduleTable({ emis, isAdmin, nextUnpaidNo, onRefres
                 )}
               </div>
 
-              <div className="px-4 py-3">
+              <div className="pl-5 pr-4 py-3">
                 {editing && editForm && (
                   <div className="mb-3 pb-3 border-b border-surface-4">
                     <div className="mb-2 rounded-lg border border-brand-200 bg-brand-50 px-3 py-2">
@@ -265,15 +298,17 @@ export default function EMIScheduleTable({ emis, isAdmin, nextUnpaidNo, onRefres
                   </div>
                 )}
 
-                <div className="grid grid-cols-1 md:grid-cols-2 md:gap-x-8 gap-y-0 divide-y md:divide-y-0 divide-surface-3">
-                  <div className="space-y-0">
-                    <KvRow label="EMI Amount" value={fmt(emi.amount)} emphasize />
+                <div className="space-y-3">
+                  <div className="rounded-xl border border-black/5 bg-white/75 px-3 py-2.5">
+                    <p className="text-[11px] uppercase tracking-wide text-ink-muted">Installment Amount</p>
+                    <p className={`text-lg font-bold num ${theme.value}`}>{fmt(emi.amount)}</p>
+                  </div>
+
+                  <div className="grid grid-cols-1 gap-y-0 divide-y divide-surface-3 rounded-xl border border-black/5 bg-white/70 px-3">
                     <KvRow label="Due Date" value={format(dueDate, 'dd MMM yyyy')} />
                     <KvRow label="EMI Paid Amount" value={fmt(emiPaidAmount)} />
                     <KvRow label="EMI Paid Date" value={emi.paid_at ? formatDateTime(emi.paid_at) : emi.partial_paid_at ? formatDateTime(emi.partial_paid_at) : '-'} />
                     <KvRow label="Remaining EMI" value={fmt(emiRemaining)} />
-                  </div>
-                  <div className="space-y-0 md:border-l md:border-surface-3 md:pl-8">
                     <KvRow label="Fine Amount" value={fmt(displayFine)} emphasize={displayFine > 0} />
                     <KvRow label="Fine Paid Amount" value={fmt(finePaidAmount)} />
                     <KvRow label="Fine Paid Date" value={formatDateTime(emi.fine_paid_at)} />
@@ -291,6 +326,8 @@ export default function EMIScheduleTable({ emis, isAdmin, nextUnpaidNo, onRefres
             </article>
           );
         })}
+          </div>
+        </div>
       </div>
     </section>
   );
