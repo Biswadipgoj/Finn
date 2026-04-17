@@ -3,10 +3,9 @@
 import { useState } from 'react';
 import { EMISchedule } from '@/lib/types';
 import { format, differenceInDays, addDays } from 'date-fns';
-import { createClient } from '@/lib/supabase/client';
 import toast from 'react-hot-toast';
 import { calculateSingleEmiFine } from '@/lib/fineCalc';
-import { formatCurrency } from '@/lib/formatters';
+import { formatCurrency, readJsonSafe } from '@/lib/formatters';
 
 interface Props {
   emis: EMISchedule[];
@@ -15,6 +14,23 @@ interface Props {
   onRefresh?: () => void;
   defaultFineAmount?: number;
 }
+
+type EditForm = {
+  emi_no: string;
+  due_date: string;
+  amount: string;
+  status: EMISchedule['status'];
+  partial_paid_amount: string;
+  collected_at: string;
+  mode: '' | 'CASH' | 'UPI';
+  utr: string;
+  fine_amount: string;
+  fine_paid_amount: string;
+  fine_paid_at: string;
+  fine_waived: boolean;
+  collected_by_role: '' | 'admin' | 'retailer';
+  collected_by_user_id: string;
+};
 
 const fmt = formatCurrency;
 
@@ -30,6 +46,13 @@ function formatDateTime(value?: string | null) {
   return format(new Date(value), 'dd MMM yyyy, hh:mm a');
 }
 
+function isoToLocalInput(value?: string | null) {
+  if (!value) return '';
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return '';
+  return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+}
+
 function KvRow({ label, value, emphasize = false }: { label: string; value: string; emphasize?: boolean }) {
   return (
     <div className="flex items-center justify-between gap-3 py-1.5">
@@ -39,28 +62,76 @@ function KvRow({ label, value, emphasize = false }: { label: string; value: stri
   );
 }
 
+function buildEditForm(emi: EMISchedule): EditForm {
+  return {
+    emi_no: String(emi.emi_no ?? ''),
+    due_date: emi.due_date || '',
+    amount: String(emi.amount ?? 0),
+    status: emi.status,
+    partial_paid_amount: String(emi.partial_paid_amount ?? 0),
+    collected_at: isoToLocalInput(emi.paid_at || emi.partial_paid_at),
+    mode: (emi.mode || '') as EditForm['mode'],
+    utr: emi.utr || '',
+    fine_amount: String(emi.fine_amount ?? 0),
+    fine_paid_amount: String(emi.fine_paid_amount ?? 0),
+    fine_paid_at: isoToLocalInput(emi.fine_paid_at),
+    fine_waived: !!emi.fine_waived,
+    collected_by_role: (emi.collected_by_role || '') as EditForm['collected_by_role'],
+    collected_by_user_id: emi.collected_by_user_id || '',
+  };
+}
+
 export default function EMIScheduleTable({ emis, isAdmin, nextUnpaidNo, onRefresh, defaultFineAmount = 450 }: Props) {
-  const supabase = createClient();
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [fineOverride, setFineOverride] = useState('');
-  const [dateOverride, setDateOverride] = useState('');
+  const [editForm, setEditForm] = useState<EditForm | null>(null);
   const [saving, setSaving] = useState(false);
   const sortedEmis = [...emis].sort((a, b) => new Date(a.due_date).getTime() - new Date(b.due_date).getTime());
 
   const paidCount = sortedEmis.filter(e => e.status === 'APPROVED').length;
 
+  function setField<K extends keyof EditForm>(key: K, value: EditForm[K]) {
+    setEditForm((prev) => prev ? ({ ...prev, [key]: value }) : prev);
+  }
+
   async function saveEdit(emi: EMISchedule) {
+    if (!editForm) return;
     setSaving(true);
-    const updates: Record<string, unknown> = {};
-    if (fineOverride !== '') updates.fine_amount = parseFloat(fineOverride) || 0;
-    if (dateOverride !== '') updates.due_date = dateOverride;
-    const { error } = await supabase.from('emi_schedule').update(updates).eq('id', emi.id);
-    setSaving(false);
-    if (error) toast.error(error.message);
-    else {
-      toast.success('EMI updated');
+    try {
+      const payload = {
+        emi_no: Number(editForm.emi_no || emi.emi_no),
+        due_date: editForm.due_date || emi.due_date,
+        amount: Number(editForm.amount || emi.amount),
+        status: editForm.status,
+        partial_paid_amount: Number(editForm.partial_paid_amount || 0),
+        collected_at: editForm.collected_at || null,
+        mode: editForm.mode || null,
+        utr: editForm.utr.trim() || null,
+        fine_amount: Number(editForm.fine_amount || 0),
+        fine_paid_amount: Number(editForm.fine_paid_amount || 0),
+        fine_paid_at: editForm.fine_paid_at || null,
+        fine_waived: editForm.fine_waived,
+        collected_by_role: editForm.collected_by_role || null,
+        collected_by_user_id: editForm.collected_by_user_id.trim() || null,
+      };
+
+      const res = await fetch(`/api/admin/emi/${emi.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      const json = await readJsonSafe<{ ok?: boolean; error?: string; message?: string }>(res);
+
+      if (!res.ok || !json?.ok) {
+        toast.error(json?.error || 'Failed to update EMI');
+        return;
+      }
+
+      toast.success(json.message || 'EMI updated successfully');
       setEditingId(null);
+      setEditForm(null);
       onRefresh?.();
+    } finally {
+      setSaving(false);
     }
   }
 
@@ -117,42 +188,59 @@ export default function EMIScheduleTable({ emis, isAdmin, nextUnpaidNo, onRefres
                         <button onClick={() => saveEdit(emi)} disabled={saving} className="btn-success text-xs px-2 py-1">
                           {saving ? '…' : 'Save'}
                         </button>
-                        <button onClick={() => setEditingId(null)} className="btn-secondary text-xs px-2 py-1">Cancel</button>
+                        <button onClick={() => { setEditingId(null); setEditForm(null); }} className="btn-secondary text-xs px-2 py-1">Cancel</button>
                       </>
                     ) : (
-                      emi.status === 'UNPAID' && (
-                        <button
-                          onClick={() => {
-                            setEditingId(emi.id);
-                            setFineOverride('');
-                            setDateOverride('');
-                          }}
-                          className="btn-ghost text-xs px-2 py-1"
-                        >
-                          Edit
-                        </button>
-                      )
+                      <button
+                        onClick={() => {
+                          setEditingId(emi.id);
+                          setEditForm(buildEditForm(emi));
+                        }}
+                        className="btn-ghost text-xs px-2 py-1"
+                      >
+                        Edit
+                      </button>
                     )}
                   </div>
                 )}
               </div>
 
               <div className="px-4 py-3">
-                {editing && (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-3 pb-3 border-b border-surface-4">
-                    <input
-                      type="date"
-                      value={dateOverride || emi.due_date}
-                      onChange={e => setDateOverride(e.target.value)}
-                      className="input py-2 text-sm"
-                    />
-                    <input
-                      type="number"
-                      value={fineOverride}
-                      onChange={e => setFineOverride(e.target.value)}
-                      placeholder={String(emi.fine_amount || 0)}
-                      className="input py-2 text-sm"
-                    />
+                {editing && editForm && (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 mb-3 pb-3 border-b border-surface-4">
+                    <input type="number" value={editForm.emi_no} onChange={e => setField('emi_no', e.target.value)} className="input py-2 text-sm" placeholder="EMI No" />
+                    <input type="date" value={editForm.due_date} onChange={e => setField('due_date', e.target.value)} className="input py-2 text-sm" />
+                    <input type="number" value={editForm.amount} onChange={e => setField('amount', e.target.value)} className="input py-2 text-sm" placeholder="EMI Amount" />
+                    <select value={editForm.status} onChange={e => setField('status', e.target.value as EditForm['status'])} className="input py-2 text-sm">
+                      <option value="UNPAID">UNPAID</option>
+                      <option value="PARTIALLY_PAID">PARTIALLY_PAID</option>
+                      <option value="PENDING_APPROVAL">PENDING_APPROVAL</option>
+                      <option value="APPROVED">APPROVED</option>
+                    </select>
+
+                    <input type="number" value={editForm.partial_paid_amount} onChange={e => setField('partial_paid_amount', e.target.value)} className="input py-2 text-sm" placeholder="EMI Paid Amount" />
+                    <input type="datetime-local" value={editForm.collected_at} onChange={e => setField('collected_at', e.target.value)} className="input py-2 text-sm" />
+                    <select value={editForm.mode} onChange={e => setField('mode', e.target.value as EditForm['mode'])} className="input py-2 text-sm">
+                      <option value="">Payment Mode</option>
+                      <option value="CASH">CASH</option>
+                      <option value="UPI">UPI</option>
+                    </select>
+
+                    <input type="text" value={editForm.utr} onChange={e => setField('utr', e.target.value)} className="input py-2 text-sm" placeholder="UTR / Reference" />
+                    <input type="number" value={editForm.fine_amount} onChange={e => setField('fine_amount', e.target.value)} className="input py-2 text-sm" placeholder="Fine Amount" />
+                    <input type="number" value={editForm.fine_paid_amount} onChange={e => setField('fine_paid_amount', e.target.value)} className="input py-2 text-sm" placeholder="Fine Paid" />
+                    <input type="datetime-local" value={editForm.fine_paid_at} onChange={e => setField('fine_paid_at', e.target.value)} className="input py-2 text-sm" />
+
+                    <select value={editForm.collected_by_role} onChange={e => setField('collected_by_role', e.target.value as EditForm['collected_by_role'])} className="input py-2 text-sm">
+                      <option value="">Collected by role</option>
+                      <option value="admin">admin</option>
+                      <option value="retailer">retailer</option>
+                    </select>
+                    <input type="text" value={editForm.collected_by_user_id} onChange={e => setField('collected_by_user_id', e.target.value)} className="input py-2 text-sm" placeholder="Collected by user ID" />
+                    <label className="inline-flex items-center gap-2 px-2 py-2 rounded-xl border border-surface-4 text-sm text-ink-muted">
+                      <input type="checkbox" checked={editForm.fine_waived} onChange={e => setField('fine_waived', e.target.checked)} />
+                      Fine Waived
+                    </label>
                   </div>
                 )}
 
