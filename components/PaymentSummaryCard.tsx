@@ -29,6 +29,64 @@ function emiPrincipalPaidForRow(emi: EMISchedule, defaultEmiAmount: number) {
   return 0;
 }
 
+type PaymentSummaryDebug = {
+  totalEmiPrincipal: number;
+  totalEmiPrincipalPaid: number;
+  totalFinePaid: number;
+  totalFineDue: number;
+  firstChargePaid: number;
+  totalPaid: number;
+  paidEmis: number;
+  nextOutstandingEmi: EMISchedule | null;
+};
+
+function buildPaymentSummaryDebug(emis: EMISchedule[], customer: Customer) {
+  // Guard against accidental duplicate EMI rows from mixed/joined sources.
+  const uniqueEmis = Array.from(new Map(emis.map((emi) => [emi.id, emi])).values()).sort((a, b) => a.emi_no - b.emi_no);
+  const emiAmount = toNumber(customer.emi_amount);
+
+  const totalEmiPrincipal = uniqueEmis.reduce((acc, emi) => acc + toNumber(emi.amount, emiAmount), 0);
+  const totalEmiPrincipalPaid = uniqueEmis.reduce(
+    (acc, emi) => acc + Math.min(toNumber(emi.amount, emiAmount), emiPrincipalPaidForRow(emi, emiAmount)),
+    0,
+  );
+
+  const totalFinePaid = uniqueEmis.reduce((acc, emi) => acc + Math.max(0, toNumber(emi.fine_paid_amount)), 0);
+  const totalFineDue = uniqueEmis.reduce((acc, emi) => {
+    if (emi.fine_waived) return acc;
+    const fineOutstanding = Math.max(0, toNumber(emi.fine_amount) - toNumber(emi.fine_paid_amount));
+    return acc + fineOutstanding;
+  }, 0);
+
+  const firstChargePaid = customer.first_emi_charge_paid_at ? Math.max(0, toNumber(customer.first_emi_charge_amount)) : 0;
+  const totalPaid = totalEmiPrincipalPaid + totalFinePaid + firstChargePaid;
+
+  const paidEmis = uniqueEmis.filter((emi) => {
+    const scheduled = toNumber(emi.amount, emiAmount);
+    const principalPaid = Math.min(scheduled, emiPrincipalPaidForRow(emi, emiAmount));
+    return scheduled > 0 && principalPaid >= scheduled;
+  }).length;
+
+  // Earliest outstanding EMI principal row only.
+  const nextOutstandingEmi = uniqueEmis.find((emi) => {
+    const scheduled = toNumber(emi.amount, emiAmount);
+    const principalPaid = Math.min(scheduled, emiPrincipalPaidForRow(emi, emiAmount));
+    const remaining = Math.max(0, scheduled - principalPaid);
+    return remaining > 0 && ['UNPAID', 'PARTIALLY_PAID', 'PENDING_APPROVAL'].includes(emi.status);
+  }) || null;
+
+  return {
+    totalEmiPrincipal,
+    totalEmiPrincipalPaid,
+    totalFinePaid,
+    totalFineDue,
+    firstChargePaid,
+    totalPaid,
+    paidEmis,
+    nextOutstandingEmi,
+  } as PaymentSummaryDebug;
+}
+
 export default function PaymentSummaryCard({
   customer,
   emis,
@@ -39,35 +97,42 @@ export default function PaymentSummaryCard({
   breakdown?: DueBreakdown | null;
 }) {
   const sorted = [...emis].sort((a, b) => a.emi_no - b.emi_no);
-
+  const debugSummary = buildPaymentSummaryDebug(sorted, customer);
   const totalEmis = toNumber(customer.emi_tenure, sorted.length);
-  const paidEmis = sorted.filter((e) => e.status === 'APPROVED').length;
+  const paidEmis = debugSummary.paidEmis;
 
   const loanAmount = toNumber(
     customer.disburse_amount,
     toNumber(customer.purchase_value) - toNumber(customer.down_payment),
   );
   const emiAmount = toNumber(customer.emi_amount);
-
-  const emiPrincipalPaid = sorted.reduce(
-    (acc, emi) => acc + emiPrincipalPaidForRow(emi, emiAmount),
-    0,
-  );
-
-  // Principal remaining is independent from fine/charges.
-  const emiRemaining = Math.max(0, loanAmount - Math.min(loanAmount, emiPrincipalPaid));
-
-  const finePaid = sorted.reduce((acc, emi) => acc + toNumber(emi.fine_paid_amount), 0);
-  const fineDueFromSchedule = sorted.reduce((acc, emi) => {
-    if (emi.fine_waived) return acc;
-    const due = Math.max(0, toNumber(emi.fine_amount) - toNumber(emi.fine_paid_amount));
-    return acc + due;
-  }, 0);
-
-  const effectiveFineDue = Math.max(0, toNumber(breakdown?.fine_due, fineDueFromSchedule));
+  const emiRemaining = Math.max(0, debugSummary.totalEmiPrincipal - debugSummary.totalEmiPrincipalPaid);
+  const finePaid = debugSummary.totalFinePaid;
+  const effectiveFineDue = Math.max(0, debugSummary.totalFineDue);
+  const totalPaid = debugSummary.totalPaid;
   const totalRemaining = emiRemaining + effectiveFineDue;
-  const nextEmi = sorted.find(e => e.status === 'UNPAID' || e.status === 'PARTIALLY_PAID');
-  const nextEmiDue = Math.max(0, toNumber(nextEmi?.amount) - toNumber(nextEmi?.partial_paid_amount));
+  const nextEmi = debugSummary.nextOutstandingEmi;
+  const nextEmiDue = nextEmi
+    ? Math.max(
+        0,
+        toNumber(nextEmi.amount, emiAmount) - Math.min(toNumber(nextEmi.amount, emiAmount), emiPrincipalPaidForRow(nextEmi, emiAmount)),
+      )
+    : 0;
+  const nextDueDate = nextEmi?.due_date ?? breakdown?.next_emi_due_date ?? null;
+
+  // Temporary debug helper for validating source-of-truth math; not rendered in UI.
+  if (process.env.NODE_ENV !== 'production') {
+    console.debug('[PaymentSummaryCard:debug]', {
+      customerId: customer.id,
+      totalEmiPrincipal: debugSummary.totalEmiPrincipal,
+      totalEmiPrincipalPaid: debugSummary.totalEmiPrincipalPaid,
+      totalFinePaid: debugSummary.totalFinePaid,
+      totalFineDue: debugSummary.totalFineDue,
+      nextOutstandingEmi: debugSummary.nextOutstandingEmi
+        ? { emi_no: debugSummary.nextOutstandingEmi.emi_no, due_date: debugSummary.nextOutstandingEmi.due_date }
+        : null,
+    });
+  }
 
   const rows = [
     { label: 'Loan Amount', value: formatCurrency(loanAmount) },
@@ -80,7 +145,7 @@ export default function PaymentSummaryCard({
     { label: 'Fine Due', value: formatCurrency(effectiveFineDue) },
     { label: 'Total Remaining', value: formatCurrency(totalRemaining) },
     { label: 'Next EMI Due', value: formatCurrency(breakdown?.next_emi_amount ?? nextEmiDue) },
-    { label: 'Next Due Date', value: formatDateOnly(breakdown?.next_emi_due_date ?? nextEmi?.due_date ?? null) },
+    { label: 'Next Due Date', value: formatDateOnly(nextDueDate) },
     { label: 'Status', value: statusLabel(customer) },
   ];
 
