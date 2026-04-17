@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { Customer, EMISchedule, DueBreakdown } from '@/lib/types';
 import { format, differenceInDays } from 'date-fns';
 import toast from 'react-hot-toast';
@@ -351,7 +351,25 @@ export default function CustomerPortal() {
     } catch {
       // fall back to whatsapp deep link
     }
-    window.open(`https://wa.me/917003617029?text=${encodeURIComponent(text)}`, '_blank');
+    const encodedText = encodeURIComponent(text);
+    const phone = '917003617029';
+    const mobileDeepLink = `whatsapp://send?phone=${phone}&text=${encodedText}`;
+    const webLink = `https://wa.me/${phone}?text=${encodedText}`;
+    const desktopLink = `https://web.whatsapp.com/send?phone=${phone}&text=${encodedText}`;
+    const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+
+    if (isMobile) {
+      window.location.href = mobileDeepLink;
+      setTimeout(() => {
+        window.open(webLink, '_blank', 'noopener,noreferrer');
+      }, 1200);
+    } else {
+      window.open(desktopLink, '_blank', 'noopener,noreferrer');
+      setTimeout(() => {
+        window.open(webLink, '_blank', 'noopener,noreferrer');
+      }, 900);
+    }
+
     if (file) {
       const url = URL.createObjectURL(file);
       const a = document.createElement('a');
