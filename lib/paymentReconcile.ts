@@ -177,7 +177,8 @@ export async function applyApprovedRequestEffects(svc: Svc, request: RequestRow,
     const { data: emis } = await svc.from('emi_schedule')
       .select('id, customer_id, emi_no, amount, status, due_date, paid_at, mode, utr, approved_by, collected_by_role, collected_by_user_id, partial_paid_amount, partial_paid_at')
       .in('id', emiIds);
-    const emiMap = new Map((emis || []).map((e: EmiRow) => [e.id, e]));
+    const emiRows = (emis || []) as EmiRow[];
+    const emiMap = new Map(emiRows.map((e) => [e.id, e]));
     for (const item of items) {
       const emi = emiMap.get(item.emi_schedule_id);
       if (!emi) continue;
@@ -197,7 +198,8 @@ export async function reverseApprovedRequestEffects(svc: Svc, request: RequestRo
     const { data: emis } = await svc.from('emi_schedule')
       .select('id, customer_id, emi_no, amount, status, due_date, paid_at, mode, utr, approved_by, collected_by_role, collected_by_user_id, partial_paid_amount, partial_paid_at')
       .in('id', emiIds);
-    const emiMap = new Map((emis || []).map((e: EmiRow) => [e.id, e]));
+    const emiRows = (emis || []) as EmiRow[];
+    const emiMap = new Map(emiRows.map((e) => [e.id, e]));
     for (const item of items) {
       const emi = emiMap.get(item.emi_schedule_id);
       if (!emi) continue;

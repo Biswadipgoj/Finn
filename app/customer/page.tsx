@@ -41,6 +41,7 @@ export default function CustomerPortal() {
   // Multi-loan selection
   const [multiLoans, setMultiLoans] = useState<MultiLoanEntry[] | null>(null);
   const [loadingLoan, setLoadingLoan] = useState(false);
+  const [selectionToken, setSelectionToken] = useState<string | null>(null);
   // Broadcast messages
   const [broadcastMessages, setBroadcastMessages] = useState<{ id: string; message: string; image_url?: string | null; expires_at: string; sender_name?: string; sender_role?: string }[]>([]);
   const [dismissedBroadcasts, setDismissedBroadcasts] = useState<Set<string>>(new Set());
@@ -124,19 +125,20 @@ export default function CustomerPortal() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ aadhaar: aadhaar || undefined, mobile: mobile || undefined }),
       });
-      const data = await readJsonSafe<{ error?: string; customer?: unknown; emis?: unknown[]; breakdown?: unknown; multi?: boolean; customers?: unknown[]; broadcasts?: unknown[] }>(res) || {};
-      if (!res.ok) { toast.error(data.error); return; }
+      const data = await readJsonSafe<{ error?: string; customer?: Customer; emis?: EMISchedule[]; breakdown?: DueBreakdown | null; multi?: boolean; selection_token?: string; customers?: MultiLoanEntry[]; broadcasts?: { id: string; message: string; image_url?: string | null; expires_at: string; sender_name?: string; sender_role?: string }[] }>(res) || {};
+      if (!res.ok) { toast.error(data.error || 'Login failed'); return; }
 
       // Multi-loan: show selection list
       if (data.multi && data.customers) {
+        setSelectionToken(data.selection_token || null);
         setMultiLoans(data.customers);
         return;
       }
 
       const newSession: CustomerSession = {
-        customer: data.customer,
-        emis: data.emis,
-        breakdown: data.breakdown,
+        customer: data.customer as Customer,
+        emis: data.emis || [],
+        breakdown: data.breakdown || null,
       };
       setSession(newSession);
       if (data.broadcasts?.length) setBroadcastMessages(data.broadcasts);
@@ -158,14 +160,15 @@ export default function CustomerPortal() {
           customer_id: customerId,
           aadhaar: aadhaar || undefined,
           mobile: mobile || undefined,
+          selection_token: selectionToken || undefined,
         }),
       });
-      const data = await readJsonSafe<{ error?: string; customer?: unknown; emis?: unknown[]; breakdown?: unknown; multi?: boolean; customers?: unknown[]; broadcasts?: unknown[] }>(res) || {};
-      if (!res.ok) { toast.error(data.error); return; }
+      const data = await readJsonSafe<{ error?: string; customer?: Customer; emis?: EMISchedule[]; breakdown?: DueBreakdown | null; multi?: boolean; selection_token?: string; customers?: MultiLoanEntry[]; broadcasts?: { id: string; message: string; image_url?: string | null; expires_at: string; sender_name?: string; sender_role?: string }[] }>(res) || {};
+      if (!res.ok) { toast.error(data.error || 'Login failed'); return; }
       const newSession: CustomerSession = {
-        customer: data.customer,
-        emis: data.emis,
-        breakdown: data.breakdown,
+        customer: data.customer as Customer,
+        emis: data.emis || [],
+        breakdown: data.breakdown || null,
       };
       setSession(newSession);
       setMultiLoans(null);
@@ -183,6 +186,7 @@ export default function CustomerPortal() {
     setShowUpcomingAlert(false);
     setMultiLoans(null);
     localStorage.removeItem(SESSION_KEY);
+    setSelectionToken(null);
     setAadhaar('');
     setMobile('');
   }

@@ -1,7 +1,7 @@
 export const dynamic = 'force-dynamic';
 
 import React from 'react';
-import { createServiceClient } from '@/lib/supabase/server';
+import { createClient, createServiceClient } from '@/lib/supabase/server';
 import { formatDateTime, formatDateOnly } from '@/lib/formatters';
 import { notFound } from 'next/navigation';
 import PrintButton from '@/components/PrintButton';
@@ -13,13 +13,23 @@ function fmt(n: number) {
 type Status = 'PENDING' | 'PENDING_APPROVAL' | 'APPROVED' | 'REJECTED';
 
 export default async function ReceiptPage({ params }: { params: { id: string } }) {
-  // Use service client — receipt URLs are public (shared via WhatsApp etc.)
   const supabase = createServiceClient();
+
+  const authClient = createClient();
+  const { data: { user } } = await authClient.auth.getUser();
+  if (!user) notFound();
+
+  const { data: profile } = await authClient
+    .from('profiles')
+    .select('role')
+    .eq('user_id', user.id)
+    .maybeSingle();
+
 
   const { data: request } = await supabase
     .from('payment_requests')
     .select(`
-      *,
+      id, customer_id, retailer_id, submitted_by, status, mode, utr, total_emi_amount, fine_amount, first_emi_charge_amount, total_amount, notes, approved_at, rejection_reason, created_at,
       customer:customers(customer_name, father_name, imei, mobile, model_no, aadhaar, first_emi_charge_amount, retailer:retailers(name, mobile)),
       retailer:retailers(name, username, mobile),
       items:payment_request_items(emi_no, amount)
@@ -28,6 +38,18 @@ export default async function ReceiptPage({ params }: { params: { id: string } }
     .single();
 
   if (!request) notFound();
+
+  if (profile?.role !== 'super_admin') {
+    const { data: retailer } = await supabase
+      .from('retailers')
+      .select('id')
+      .eq('auth_user_id', user.id)
+      .maybeSingle();
+
+    if (!retailer || retailer.id !== request.retailer_id) {
+      notFound();
+    }
+  }
 
   const status: Status = (request.status as Status) ?? 'PENDING';
   const customer = request.customer as {
