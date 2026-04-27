@@ -27,7 +27,14 @@ export default function LoginPage() {
     setLoading(true);
     try {
       const { error } = await supabase.auth.signInWithPassword({ email: toEmail(username, tab), password });
-      if (error) { toast.error('Incorrect username or password'); return; }
+      if (error) {
+        if (error.message?.toLowerCase().includes('missing supabase')) {
+          toast.error('App configuration missing. Please set Supabase public env variables in Vercel.');
+        } else {
+          toast.error('Incorrect username or password');
+        }
+        return;
+      }
       toast.success('Welcome!');
       router.replace(tab === 'admin' ? '/admin' : '/retailer');
       router.refresh();

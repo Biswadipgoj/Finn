@@ -1,13 +1,13 @@
 import { createBrowserClient } from '@supabase/ssr';
 
-function createPrerenderSafeClient() {
+function createPrerenderSafeClient(reason = 'Supabase client unavailable') {
   const chain: any = new Proxy(function noop() {}, {
     get(_target, prop) {
       if (prop === 'then') return undefined;
       if (prop === 'auth') {
         return {
           getUser: async () => ({ data: { user: null }, error: null }),
-          signInWithPassword: async () => ({ data: null, error: new Error('Supabase client is unavailable during prerender') }),
+          signInWithPassword: async () => ({ data: null, error: new Error(reason) }),
           signOut: async () => ({ error: null }),
         };
       }
@@ -19,20 +19,19 @@ function createPrerenderSafeClient() {
   return chain;
 }
 
-function requiredPublicEnv(name: string) {
-  const value = process.env[name];
-  if (!value) {
-    throw new Error(`Missing required environment variable: ${name}. Add it in Vercel Project Settings > Environment Variables.`);
-  }
-  return value;
-}
-
 export function createClient() {
-  // Client components are pre-rendered on the server during `next build`.
-  if (typeof window === 'undefined') return createPrerenderSafeClient();
+  if (typeof window === 'undefined') {
+    return createPrerenderSafeClient('Supabase client is unavailable during prerender');
+  }
 
-  return createBrowserClient(
-    requiredPublicEnv('NEXT_PUBLIC_SUPABASE_URL'),
-    requiredPublicEnv('NEXT_PUBLIC_SUPABASE_ANON_KEY')
-  );
+  // IMPORTANT: in Next.js client bundles, env access must be static (no process.env[name]).
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim();
+  const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.trim();
+
+  if (!url || !anon) {
+    console.error('Missing NEXT_PUBLIC_SUPABASE_URL or NEXT_PUBLIC_SUPABASE_ANON_KEY. Configure them in Vercel Project Settings.');
+    return createPrerenderSafeClient('Missing Supabase public environment variables');
+  }
+
+  return createBrowserClient(url, anon);
 }
