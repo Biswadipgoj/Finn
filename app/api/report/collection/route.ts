@@ -1,0 +1,31 @@
+export const dynamic = 'force-dynamic';
+
+import { NextRequest, NextResponse } from 'next/server';
+import { createClient, createServiceClient } from '@/lib/supabase/server';
+export async function GET(req: NextRequest) {
+  const supabase = createClient();
+  const { data: { user }, error: authError } = await supabase.auth.getUser();
+  if (authError || !user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  const { data: profile } = await supabase.from('profiles').select('role').eq('user_id', user.id).single();
+  if (profile?.role !== 'super_admin') return NextResponse.json({ error: 'Forbidden — super admin only' }, { status: 403 });
+  const svc = createServiceClient();
+  const m = parseInt(req.nextUrl.searchParams.get('month') || String(new Date().getMonth()+1));
+  const y = parseInt(req.nextUrl.searchParams.get('year') || String(new Date().getFullYear()));
+  const ms = new Date(y, m-1, 1).toISOString();
+  const me = new Date(y, m, 0, 23, 59, 59).toISOString();
+  const { data: retailers } = await svc.from('retailers').select('id, name').eq('is_active', true).order('name');
+  const rows: string[][] = [['Retailer','Total EMI','Total Fine','Total 1st Charge','Total Collection','Customers']];
+  for (const r of retailers || []) {
+    const { data: payments } = await svc.from('payment_requests').select('total_emi_amount, fine_amount, first_emi_charge_amount, total_amount, customer_id').eq('retailer_id', r.id).eq('status', 'APPROVED').gte('approved_at', ms).lte('approved_at', me);
+    const p = payments || [];
+    const emi = p.reduce((s,x) => s + (Number(x.total_emi_amount)||0), 0);
+    const fine = p.reduce((s,x) => s + (Number(x.fine_amount)||0), 0);
+    const charge = p.reduce((s,x) => s + (Number(x.first_emi_charge_amount)||0), 0);
+    const tot = p.reduce((s,x) => s + (Number(x.total_amount)||0), 0);
+    const custs = new Set(p.map(x => x.customer_id)).size;
+    if (tot > 0) rows.push([r.name, String(emi), String(fine), String(charge), String(tot), String(custs)]);
+  }
+  const csv = rows.map(r => r.join(',')).join('\r\n');
+  const mn = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'][m-1];
+  return new NextResponse(csv, { headers: { 'Content-Type': 'text/csv', 'Content-Disposition': `attachment; filename="Retailer_Collection_${mn}_${y}.csv"` } });
+}
