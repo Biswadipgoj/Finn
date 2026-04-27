@@ -167,7 +167,7 @@ export default function AdminDashboard() {
   const [broadcastExpiry, setBroadcastExpiry] = useState('');
   const [broadcastLoading, setBroadcastLoading] = useState(false);
   const [broadcastHistory, setBroadcastHistory] = useState<{
-    id: string; message: string; expires_at: string; created_at: string;
+    id: string; message: string; image_url?: string | null; expires_at: string; created_at: string;
     retailer?: { name?: string };
   }[]>([]);
 

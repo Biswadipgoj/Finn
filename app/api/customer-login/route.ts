@@ -1,5 +1,6 @@
 export const dynamic = 'force-dynamic';
 
+import crypto from 'crypto';
 import { NextRequest, NextResponse } from 'next/server';
 import { createServiceClient } from '@/lib/supabase/server';
 
@@ -15,6 +16,30 @@ const CUSTOMER_SELECT = `
 
 function cleanDigits(value?: string) {
   return (value ?? '').replace(/\D/g, '');
+}
+
+function getLoginSecret() {
+  return process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'finn-customer-login-secret';
+}
+
+function createSelectionToken(payload: { aadhaar?: string; mobile?: string }) {
+  const expiresAt = Date.now() + 10 * 60 * 1000;
+  const encoded = Buffer.from(JSON.stringify({ ...payload, exp: expiresAt })).toString('base64url');
+  const sig = crypto.createHmac('sha256', getLoginSecret()).update(encoded).digest('base64url');
+  return `${encoded}.${sig}`;
+}
+
+function validateSelectionToken(token: string, payload: { aadhaar?: string; mobile?: string }) {
+  const [encoded, sig] = token.split('.');
+  if (!encoded || !sig) return false;
+  const expected = crypto.createHmac('sha256', getLoginSecret()).update(encoded).digest('base64url');
+  if (sig !== expected) return false;
+
+  const parsed = JSON.parse(Buffer.from(encoded, 'base64url').toString('utf8')) as { aadhaar?: string; mobile?: string; exp?: number };
+  if (!parsed.exp || parsed.exp < Date.now()) return false;
+  if ((parsed.aadhaar || '') !== (payload.aadhaar || '')) return false;
+  if ((parsed.mobile || '') !== (payload.mobile || '')) return false;
+  return true;
 }
 
 async function buildCustomerPayload(serviceClient: ReturnType<typeof createServiceClient>, customer: { id: string; retailer_id: string }) {
@@ -40,23 +65,18 @@ async function buildCustomerPayload(serviceClient: ReturnType<typeof createServi
 
 export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => ({}));
-  const { aadhaar, mobile, customer_id } = body as { aadhaar?: string; mobile?: string; customer_id?: string };
+  const { aadhaar, mobile, customer_id, selection_token } = body as { aadhaar?: string; mobile?: string; customer_id?: string; selection_token?: string };
 
   const serviceClient = createServiceClient();
   const cleanAadhaar = cleanDigits(aadhaar);
   const cleanMobile = cleanDigits(mobile);
 
-  // Direct load by customer_id is only allowed when the same Aadhaar/mobile credential
-  // is supplied again. This prevents IDOR access by guessing or leaking a customer UUID.
   if (customer_id) {
     if (!cleanAadhaar && !cleanMobile) {
       return NextResponse.json({ error: 'Aadhaar or mobile is required to select this account' }, { status: 400 });
     }
-    if (cleanAadhaar && cleanAadhaar.length !== 12) {
-      return NextResponse.json({ error: 'Aadhaar must be exactly 12 digits' }, { status: 400 });
-    }
-    if (cleanMobile && cleanMobile.length !== 10) {
-      return NextResponse.json({ error: 'Mobile must be exactly 10 digits' }, { status: 400 });
+    if (!selection_token || !validateSelectionToken(selection_token, { aadhaar: cleanAadhaar || undefined, mobile: cleanMobile || undefined })) {
+      return NextResponse.json({ error: 'Session expired. Please login again to choose account.' }, { status: 401 });
     }
 
     let directQuery = serviceClient.from('customers').select(CUSTOMER_SELECT).eq('id', customer_id);
@@ -103,11 +123,11 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  // Multi-loan support: if multiple customers found, return all of them
   if (customers.length > 1) {
     return NextResponse.json({
       multi: true,
-      customers: customers.map(c => ({
+      selection_token: createSelectionToken({ aadhaar: cleanAadhaar || undefined, mobile: cleanMobile || undefined }),
+      customers: customers.map((c) => ({
         id: c.id,
         customer_name: c.customer_name,
         imei: c.imei,
