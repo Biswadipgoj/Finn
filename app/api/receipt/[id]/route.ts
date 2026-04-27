@@ -1,7 +1,7 @@
 export const dynamic = 'force-dynamic';
 
 import { NextRequest, NextResponse } from 'next/server';
-import { createServiceClient } from '@/lib/supabase/server';
+import { createClient, createServiceClient } from '@/lib/supabase/server';
 
 function fmt(n: number) {
   return new Intl.NumberFormat('en-IN', {
@@ -53,12 +53,26 @@ export async function GET(
   _req: NextRequest,
   { params }: { params: { id: string } }
 ) {
+
+  const supabase = createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) {
+    return new NextResponse('Unauthorized', { status: 401 });
+  }
+
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('role')
+    .eq('user_id', user.id)
+    .maybeSingle();
+
   const serviceClient = createServiceClient();
+
 
   const { data: request, error } = await serviceClient
     .from('payment_requests')
     .select(`
-      *,
+      id, customer_id, retailer_id, submitted_by, status, mode, utr, total_emi_amount, fine_amount, first_emi_charge_amount, total_amount, notes, approved_at, rejection_reason, created_at,
       customer:customers(
         id, customer_name, customer_photo_url, mobile,
         retailer:retailers(name, mobile)
@@ -71,6 +85,18 @@ export async function GET(
 
   if (error || !request) {
     return new NextResponse('Receipt not found', { status: 404 });
+  }
+
+  if (profile?.role !== 'super_admin') {
+    const { data: retailer } = await serviceClient
+      .from('retailers')
+      .select('id')
+      .eq('auth_user_id', user.id)
+      .maybeSingle();
+
+    if (!retailer || retailer.id !== request.retailer_id) {
+      return new NextResponse('Receipt not found', { status: 404 });
+    }
   }
 
   const customer = request.customer as {

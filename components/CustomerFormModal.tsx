@@ -68,6 +68,7 @@ export default function CustomerFormModal({
 
   useEffect(() => {
     if (customer) {
+      const customerData = customer as unknown as Record<string, unknown>;
       setForm({
         retailer_id: customer.retailer_id || '',
         customer_name: customer.customer_name || '',
@@ -86,7 +87,7 @@ export default function CustomerFormModal({
         down_payment: String(customer.down_payment || '0'),
         disburse_amount: customer.disburse_amount ? String(customer.disburse_amount) : '',
         purchase_date: customer.purchase_date || new Date().toISOString().split('T')[0],
-        emi_start_date: (customer as Record<string, unknown>).emi_start_date as string || '',
+        emi_start_date: customerData.emi_start_date as string || '',
         emi_due_day: String(customer.emi_due_day || '5'),
         emi_amount: String(customer.emi_amount || ''),
         emi_tenure: String(customer.emi_tenure || '6'),
@@ -95,10 +96,10 @@ export default function CustomerFormModal({
         aadhaar_front_url: customer.aadhaar_front_url || '',
         aadhaar_back_url: customer.aadhaar_back_url || '',
         bill_photo_url: customer.bill_photo_url || '',
-        emi_card_photo_url: (customer as Record<string, unknown>).emi_card_photo_url as string || '',
-        lock_provider: (customer as Record<string, unknown>).lock_provider as string || '',
-        lock_device_id: (customer as Record<string, unknown>).lock_device_id as string || '',
-        google_drive_docs: (customer as Record<string, unknown>).google_drive_docs as string || '',
+        emi_card_photo_url: customerData.emi_card_photo_url as string || '',
+        lock_provider: customerData.lock_provider as string || '',
+        lock_device_id: customerData.lock_device_id as string || '',
+        google_drive_docs: customerData.google_drive_docs as string || '',
       });
     }
   }, [customer]);
