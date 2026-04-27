@@ -19,15 +19,19 @@ function createPrerenderSafeClient(reason = 'Supabase client unavailable') {
   return chain;
 }
 
+function getPublicEnv(name: string) {
+  const value = process.env[name];
+  return value?.trim() ? value : null;
+}
+
 export function createClient() {
-  if (typeof window === 'undefined') {
-    return createPrerenderSafeClient('Supabase client is unavailable during prerender');
-  }
+  // Client components are pre-rendered on the server during `next build`.
+  if (typeof window === 'undefined') return createPrerenderSafeClient('Supabase client is unavailable during prerender');
 
-  // IMPORTANT: in Next.js client bundles, env access must be static (no process.env[name]).
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim();
-  const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.trim();
+  const url = getPublicEnv('NEXT_PUBLIC_SUPABASE_URL');
+  const anon = getPublicEnv('NEXT_PUBLIC_SUPABASE_ANON_KEY');
 
+  // Never crash the whole app on the login page if env vars were missed on Vercel.
   if (!url || !anon) {
     console.error('Missing NEXT_PUBLIC_SUPABASE_URL or NEXT_PUBLIC_SUPABASE_ANON_KEY. Configure them in Vercel Project Settings.');
     return createPrerenderSafeClient('Missing Supabase public environment variables');
