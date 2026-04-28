@@ -22,8 +22,17 @@ const fmt = formatCurrency;
 export default function EMIScheduleTable({ emis, isAdmin, nextUnpaidNo, onRefresh, defaultFineAmount = 450, weeklyFineIncrement = 25 }: Props) {
   const supabase = createClient();
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [fineOverride, setFineOverride] = useState('');
-  const [dateOverride, setDateOverride] = useState('');
+  const [editForm, setEditForm] = useState({
+    due_date: '',
+    amount: '',
+    status: 'UNPAID',
+    paid_at: '',
+    mode: '',
+    utr: '',
+    fine_amount: '',
+    fine_paid_amount: '',
+    fine_paid_at: '',
+  });
   const [saving, setSaving] = useState(false);
   const sortedEmis = [...emis].sort((a, b) => new Date(a.due_date).getTime() - new Date(b.due_date).getTime());
 
@@ -36,8 +45,15 @@ export default function EMIScheduleTable({ emis, isAdmin, nextUnpaidNo, onRefres
     }
     setSaving(true);
     const updates: Record<string, unknown> = {};
-    if (fineOverride !== '') updates.fine_amount = parseFloat(fineOverride) || 0;
-    if (dateOverride !== '') updates.due_date = dateOverride;
+    if (editForm.due_date) updates.due_date = editForm.due_date;
+    if (editForm.amount !== '') updates.amount = parseFloat(editForm.amount) || 0;
+    if (editForm.status) updates.status = editForm.status;
+    updates.paid_at = editForm.paid_at ? new Date(editForm.paid_at).toISOString() : null;
+    updates.mode = editForm.mode || null;
+    updates.utr = editForm.utr || null;
+    if (editForm.fine_amount !== '') updates.fine_amount = parseFloat(editForm.fine_amount) || 0;
+    if (editForm.fine_paid_amount !== '') updates.fine_paid_amount = parseFloat(editForm.fine_paid_amount) || 0;
+    updates.fine_paid_at = editForm.fine_paid_at ? new Date(editForm.fine_paid_at).toISOString() : null;
     const { error } = await supabase.from('emi_schedule').update(updates).eq('id', emi.id);
     setSaving(false);
     if (error) toast.error(error.message);
@@ -100,8 +116,8 @@ export default function EMIScheduleTable({ emis, isAdmin, nextUnpaidNo, onRefres
                   </td>
                   <td>
                     {editing ? (
-                      <input type="date" value={dateOverride || emi.due_date}
-                        onChange={e => setDateOverride(e.target.value)}
+                      <input type="date" value={editForm.due_date || emi.due_date}
+                        onChange={e => setEditForm(f => ({ ...f, due_date: e.target.value }))}
                         className="input py-1 px-2 text-xs w-36" />
                     ) : (
                       <div>
@@ -118,15 +134,32 @@ export default function EMIScheduleTable({ emis, isAdmin, nextUnpaidNo, onRefres
                     )}
                   </td>
                   <td className="num font-medium">
-                    <div>{fmt(emi.amount)}</div>
-                    {emi.status === 'PARTIALLY_PAID' && <div className="text-[10px] text-warning mt-0.5">Remaining: {fmt(emiRemaining)}</div>}
+                    {editing ? (
+                      <input
+                        type="number"
+                        value={editForm.amount}
+                        onChange={e => setEditForm(f => ({ ...f, amount: e.target.value }))}
+                        className="input py-1 px-2 text-xs w-28"
+                      />
+                    ) : (
+                      <>
+                        <div>{fmt(emi.amount)}</div>
+                        {emi.status === 'PARTIALLY_PAID' && <div className="text-[10px] text-warning mt-0.5">Remaining: {fmt(emiRemaining)}</div>}
+                      </>
+                    )}
                   </td>
                   <td>
                     {editing ? (
-                      <input type="number" value={fineOverride}
-                        onChange={e => setFineOverride(e.target.value)}
-                        placeholder={String(emi.fine_amount || 0)}
-                        className="input py-1 px-2 text-xs w-24" />
+                      <div className="space-y-1">
+                        <input type="number" value={editForm.fine_amount}
+                          onChange={e => setEditForm(f => ({ ...f, fine_amount: e.target.value }))}
+                          placeholder={String(emi.fine_amount || 0)}
+                          className="input py-1 px-2 text-xs w-24" />
+                        <input type="number" value={editForm.fine_paid_amount}
+                          onChange={e => setEditForm(f => ({ ...f, fine_paid_amount: e.target.value }))}
+                          placeholder={String(emi.fine_paid_amount || 0)}
+                          className="input py-1 px-2 text-xs w-24" />
+                      </div>
                     ) : displayFine > 0 ? (
                       <div>
                         <span className="num text-xs font-semibold text-danger">{fmt(fineRemaining > 0 ? fineRemaining : displayFine)}</span>
@@ -142,13 +175,57 @@ export default function EMIScheduleTable({ emis, isAdmin, nextUnpaidNo, onRefres
                     )}
                   </td>
                   <td>
-                    {emi.status === 'APPROVED' && <span className="badge-blue">✓ Paid</span>}
-                    {emi.status === 'PARTIALLY_PAID' && <span className="badge-yellow">Partial</span>}
-                    {emi.status === 'PENDING_APPROVAL' && <span className="badge-yellow">⏳ Pending</span>}
-                    {emi.status === 'UNPAID' && <span className={`badge ${isOverdue ? 'badge-red' : 'badge-gray'}`}>{isOverdue ? 'Overdue' : 'Unpaid'}</span>}
+                    {editing ? (
+                      <select value={editForm.status} onChange={e => setEditForm(f => ({ ...f, status: e.target.value }))} className="input py-1 px-2 text-xs w-32">
+                        <option value="UNPAID">UNPAID</option>
+                        <option value="PENDING_APPROVAL">PENDING_APPROVAL</option>
+                        <option value="PARTIALLY_PAID">PARTIALLY_PAID</option>
+                        <option value="APPROVED">APPROVED</option>
+                      </select>
+                    ) : (
+                      <>
+                        {emi.status === 'APPROVED' && <span className="badge-blue">✓ Paid</span>}
+                        {emi.status === 'PARTIALLY_PAID' && <span className="badge-yellow">Partial</span>}
+                        {emi.status === 'PENDING_APPROVAL' && <span className="badge-yellow">⏳ Pending</span>}
+                        {emi.status === 'UNPAID' && <span className={`badge ${isOverdue ? 'badge-red' : 'badge-gray'}`}>{isOverdue ? 'Overdue' : 'Unpaid'}</span>}
+                      </>
+                    )}
                   </td>
                   <td className="num text-xs text-ink-muted">
-                    {emi.paid_at ? formatDateOnly(emi.paid_at) : emi.partial_paid_at ? `${formatDateOnly(emi.partial_paid_at)} (partial)` : '—'}
+                    {editing ? (
+                      <input
+                        type="datetime-local"
+                        value={editForm.paid_at}
+                        onChange={e => setEditForm(f => ({ ...f, paid_at: e.target.value }))}
+                        className="input py-1 px-2 text-xs w-44"
+                      />
+                    ) : (
+                      emi.paid_at ? formatDateOnly(emi.paid_at) : emi.partial_paid_at ? `${formatDateOnly(emi.partial_paid_at)} (partial)` : '—'
+                    )}
+                  </td>
+                  <td className="text-xs text-ink-muted">
+                    {editing ? (
+                      <select value={editForm.mode} onChange={e => setEditForm(f => ({ ...f, mode: e.target.value }))} className="input py-1 px-2 text-xs w-24">
+                        <option value="">—</option>
+                        <option value="CASH">CASH</option>
+                        <option value="UPI">UPI</option>
+                      </select>
+                    ) : (emi.mode || '\u2014')}
+                  </td>
+                  <td className="num text-xs text-ink-muted break-all">
+                    {editing ? (
+                      <input value={editForm.utr} onChange={e => setEditForm(f => ({ ...f, utr: e.target.value }))} className="input py-1 px-2 text-xs w-32" />
+                    ) : (emi.utr || '\u2014')}
+                  </td>
+                  <td className="num text-xs text-ink-muted">
+                    {editing ? (
+                      <input
+                        type="datetime-local"
+                        value={editForm.fine_paid_at}
+                        onChange={e => setEditForm(f => ({ ...f, fine_paid_at: e.target.value }))}
+                        className="input py-1 px-2 text-xs w-44"
+                      />
+                    ) : (emi.fine_paid_at ? formatDateOnly(emi.fine_paid_at) : '\u2014')}
                   </td>
                   <td className="text-xs text-ink-muted">{emi.mode || '\u2014'}</td>
                   <td className="num text-xs text-ink-muted break-all">{emi.utr || '\u2014'}</td>

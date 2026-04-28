@@ -840,6 +840,16 @@ export default function AdminDashboard() {
                     min={0}
                   />
                 </div>
+                <div className="flex-1 max-w-xs min-w-[220px]">
+                  <label className="form-label">Weekly Fine Increment (₹)</label>
+                  <input
+                    type="number"
+                    value={fineSettings.weekly_fine_increment}
+                    onChange={(e) => setFineSettings((f) => ({ ...f, weekly_fine_increment: parseFloat(e.target.value) }))}
+                    className="form-input"
+                    min={0}
+                  />
+                </div>
                 <button onClick={updateFineSettings} className="btn-primary">Save</button>
               </div>
               <p className="text-xs text-ink-muted mt-2">
