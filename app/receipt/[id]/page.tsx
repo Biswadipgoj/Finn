@@ -153,8 +153,16 @@ export default async function ReceiptPage({ params }: { params: { id: string } }
             {/* Transaction details */}
             <Section title="TRANSACTION DETAILS">
               <KV label="Payment Mode" value={request.mode} bold color={request.mode === 'UPI' ? '#1d4ed8' : '#16a34a'} />
+              <KV label="Payment UTR" value={request.utr || '—'} mono small color={request.utr ? '#1d4ed8' : undefined} />
               {request.mode === 'UPI' && (
                 <KV label="UPI ID" value="biswajit.khanra82@axl" mono small />
+              )}
+              {(request.fine_amount ?? 0) > 0 && (
+                <>
+                  <KV label="Fine Payment Date" value={request.approved_at ? formatDateTime(request.approved_at) : formatDateTime(request.created_at)} mono small color="#991b1b" />
+                  <KV label="Fine Payment Method" value={request.mode ?? '—'} bold color={request.mode === 'UPI' ? '#1d4ed8' : '#16a34a'} />
+                  <KV label="Fine UTR" value={request.utr || '—'} mono small color={request.utr ? '#1d4ed8' : undefined} />
+                </>
               )}
               <KV label="Collected By" value={retailer?.name ?? '—'} />
               <KV label="Submitted On" value={formatDateTime(request.created_at)} mono small />

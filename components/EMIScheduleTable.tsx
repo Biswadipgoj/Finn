@@ -184,9 +184,14 @@ export default function EMIScheduleTable({ emis, isAdmin, nextUnpaidNo, onRefres
           const emiPaidAmount = Math.max(0, Number(emi.partial_paid_amount || 0));
           const emiRemaining = Math.max(0, Number(emi.amount || 0) - emiPaidAmount);
           const fineRemaining = Math.max(0, displayFine - Number(emi.fine_paid_amount || 0));
+          const finePaid = Number(emi.fine_paid_amount || 0);
+          const fineStatus =
+            finePaid > 0 && fineRemaining > 0 ? 'Partially Paid' :
+            fineRemaining === 0 && displayFine > 0 ? 'Paid' :
+            displayFine > 0 ? 'Due' : '—';
           return (
-            <div key={emi.id} className={`p-4 space-y-2 ${isOverdue ? 'bg-danger-light/40' : isNext ? 'bg-brand-50/50' : ''}`}>
-              <div className="flex items-center justify-between">
+            <div key={emi.id} className={`p-4 space-y-3 ${isOverdue ? 'bg-danger-light/40 border-l-4 border-danger' : isNext ? 'bg-brand-50/60 border-l-4 border-brand-500' : 'bg-white'}`}>
+              <div className="flex items-center justify-between gap-2">
                 <p className="font-semibold text-ink">EMI #{emi.emi_no}</p>
                 {emi.status === 'APPROVED' && <span className="badge-blue">✓ Paid</span>}
                 {emi.status === 'PARTIALLY_PAID' && <span className="badge-yellow">Partial</span>}
@@ -194,12 +199,17 @@ export default function EMIScheduleTable({ emis, isAdmin, nextUnpaidNo, onRefres
                 {emi.status === 'UNPAID' && <span className={`badge ${isOverdue ? 'badge-red' : 'badge-gray'}`}>{isOverdue ? 'Overdue' : 'Unpaid'}</span>}
               </div>
               <div className="grid grid-cols-2 gap-2 text-xs">
-                <p className="text-ink-muted">Due Date</p><p className="text-right num">{format(dueDate, 'd MMM yyyy')}</p>
-                <p className="text-ink-muted">Amount</p><p className="text-right num">{fmt(emi.amount)}</p>
-                {emi.status === 'PARTIALLY_PAID' && <><p className="text-ink-muted">EMI Paid</p><p className="text-right num text-success">{fmt(emiPaidAmount)}</p><p className="text-ink-muted">EMI Remaining</p><p className="text-right num text-warning">{fmt(emiRemaining)}</p></>}
-                <p className="text-ink-muted">Fine</p><p className="text-right num">{displayFine > 0 ? fmt(fineRemaining > 0 ? fineRemaining : displayFine) : '—'}</p>
-                <p className="text-ink-muted">Fine Status</p><p className="text-right">{Number(emi.fine_paid_amount || 0) > 0 && fineRemaining > 0 ? 'Partially paid' : fineRemaining === 0 && displayFine > 0 ? 'Paid' : displayFine > 0 ? 'Due' : '—'}</p>
-                <p className="text-ink-muted">Paid On</p><p className="text-right num">{emi.paid_at ? formatDateOnly(emi.paid_at) : emi.partial_paid_at ? `${formatDateOnly(emi.partial_paid_at)} (partial)` : '—'}</p>
+                <p className="text-ink-muted">Due Date</p><p className="text-right num font-semibold">{format(dueDate, 'd MMM yyyy')}</p>
+                <p className="text-ink-muted">EMI Amount</p><p className="text-right num font-semibold text-brand-700">{fmt(emi.amount)}</p>
+                {emi.status === 'PARTIALLY_PAID' && <><p className="text-ink-muted">EMI Paid</p><p className="text-right num text-success font-semibold">{fmt(emiPaidAmount)}</p><p className="text-ink-muted">EMI Remaining</p><p className="text-right num text-warning font-semibold">{fmt(emiRemaining)}</p></>}
+                <p className="text-ink-muted">Remaining Fine</p><p className="text-right num font-semibold text-danger">{displayFine > 0 ? fmt(fineRemaining > 0 ? fineRemaining : displayFine) : '—'}</p>
+                <p className="text-ink-muted">Fine Status</p><p className={`text-right font-semibold ${fineStatus === 'Paid' ? 'text-success' : fineStatus === 'Due' ? 'text-danger' : 'text-warning'}`}>{fineStatus}</p>
+                <p className="text-ink-muted">Payment Date</p><p className="text-right num">{emi.paid_at ? formatDateOnly(emi.paid_at) : emi.partial_paid_at ? `${formatDateOnly(emi.partial_paid_at)} (partial)` : '—'}</p>
+                <p className="text-ink-muted">Payment Method</p><p className={`text-right font-semibold ${emi.mode === 'UPI' ? 'text-info' : emi.mode === 'CASH' ? 'text-success' : 'text-ink-muted'}`}>{emi.mode || '—'}</p>
+                <p className="text-ink-muted">Payment UTR</p><p className="text-right num break-all">{emi.utr || '—'}</p>
+                <p className="text-ink-muted">Fine Paid Date</p><p className="text-right num">{emi.fine_paid_at ? formatDateOnly(emi.fine_paid_at) : '—'}</p>
+                <p className="text-ink-muted">Fine Method</p><p className={`text-right font-semibold ${finePaid > 0 && emi.mode === 'UPI' ? 'text-info' : finePaid > 0 && emi.mode === 'CASH' ? 'text-success' : 'text-ink-muted'}`}>{finePaid > 0 ? (emi.mode || '—') : '—'}</p>
+                <p className="text-ink-muted">Fine UTR</p><p className="text-right num break-all">{finePaid > 0 ? (emi.utr || '—') : '—'}</p>
               </div>
             </div>
           );
