@@ -143,7 +143,7 @@ export default function PaymentModal({ customer, emis, breakdown, onClose, onSub
           <div><h2 className="font-bold text-ink text-base sm:text-lg">{isAdmin ? 'Record Payment' : 'Submit Payment'}</h2><p className="text-ink-muted text-xs mt-0.5">{customer.customer_name} · {customer.imei}</p></div>
           <button onClick={onClose} className="btn-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M18 6L6 18M6 6l12 12"/></svg></button>
         </div>
-        <div className="p-4 space-y-4 overflow-y-auto pb-24 sm:pb-4">
+        <div className="p-4 space-y-4 overflow-y-auto pb-36 sm:pb-6">
           {/* WHAT TO COLLECT — checkboxes */}
           <div className="card bg-surface-2 p-4 space-y-3">
             <p className="text-xs font-bold text-ink-muted uppercase tracking-widest">Select What to Collect</p>
@@ -228,9 +228,9 @@ export default function PaymentModal({ customer, emis, breakdown, onClose, onSub
           </div>
 
         </div>
-        <div className="sticky bottom-0 z-20 bg-white border-t border-surface-4 p-3 flex gap-3">
-          <button onClick={onClose} className="btn-secondary flex-1 py-3">Cancel</button>
-          <button onClick={handleSubmit} disabled={cannotSubmit} className="btn-primary flex-1 py-3">{loading ? '...' : isAdmin ? '✓ Record' : '→ Submit'}</button>
+        <div className="fixed sm:sticky bottom-0 left-0 right-0 z-40 bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/80 border-t border-surface-4 p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] flex gap-3">
+          <button onClick={onClose} className="btn-secondary flex-1 py-3 font-semibold">Cancel</button>
+          <button onClick={handleSubmit} disabled={cannotSubmit} className="btn-primary flex-1 py-3 font-bold shadow-md shadow-brand-500/20">{loading ? '...' : isAdmin ? '✓ Record Payment' : '→ Submit Payment'}</button>
         </div>
       </div>
     </div>
