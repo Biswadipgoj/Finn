@@ -250,7 +250,11 @@ export default function AdminDashboard() {
     const { data: bd, error: bdErr } = await sb.rpc('get_due_breakdown', { p_customer_id: customer.id });
     if (bdErr) {
       const next = emiList.find(e => e.status === 'UNPAID' || e.status === 'PARTIALLY_PAID');
-      const af = calculateTotalFineFromEmis(emiList);
+      const af = calculateTotalFineFromEmis(
+        emiList,
+        Number(fineSettings.default_fine_amount || 450),
+        Number(fineSettings.weekly_fine_increment || 25),
+      );
       const fc = customer.first_emi_charge_paid_at ? 0 : (customer.first_emi_charge_amount || 0);
       setBreakdown({ customer_id: customer.id, customer_status: customer.status, next_emi_no: next?.emi_no, next_emi_amount: next?.amount, next_emi_due_date: next?.due_date, next_emi_status: next?.status, fine_due: af, first_emi_charge_due: fc, total_payable: (next?.amount ?? 0) + af + fc, popup_first_emi_charge: fc > 0, popup_fine_due: af > 0, is_overdue: next ? new Date(next.due_date) < new Date() : false } as DueBreakdown);
     } else setBreakdown(bd as DueBreakdown);
@@ -645,6 +649,7 @@ export default function AdminDashboard() {
                   isAdmin={true}
                   onRefresh={refreshSelectedCustomer}
                   defaultFineAmount={fineSettings.default_fine_amount}
+                  weeklyFineIncrement={fineSettings.weekly_fine_increment}
                 />
               </div>
             )}
@@ -811,8 +816,8 @@ export default function AdminDashboard() {
             {/* Fine Settings */}
             <div className="card p-6">
               <p className="section-header">Fine Settings</p>
-              <div className="flex items-end gap-4">
-                <div className="flex-1 max-w-xs">
+              <div className="flex items-end gap-4 flex-wrap">
+                <div className="flex-1 max-w-xs min-w-[220px]">
                   <label className="form-label">Default Late Fine Amount (₹)</label>
                   <input
                     type="number"
@@ -822,10 +827,20 @@ export default function AdminDashboard() {
                     min={0}
                   />
                 </div>
+                <div className="flex-1 max-w-xs min-w-[220px]">
+                  <label className="form-label">Weekly Fine Increment (₹)</label>
+                  <input
+                    type="number"
+                    value={fineSettings.weekly_fine_increment}
+                    onChange={(e) => setFineSettings((f) => ({ ...f, weekly_fine_increment: parseFloat(e.target.value) }))}
+                    className="form-input"
+                    min={0}
+                  />
+                </div>
                 <button onClick={updateFineSettings} className="btn-primary">Save</button>
               </div>
               <p className="text-xs text-ink-muted mt-2">
-                Default ₹450. Applies when the next unpaid EMI is past due. Can be waived or overridden per-EMI in the customer view.
+                Defaults are ₹450 base and ₹25 weekly increment. Both are editable and apply across reports and fine calculations.
               </p>
             </div>
 
@@ -1247,6 +1262,8 @@ export default function AdminDashboard() {
           onClose={() => setShowPaymentModal(false)}
           onSubmitted={async () => { await refreshSelectedCustomer(); loadPendingCount(); }}
           isAdmin={true}
+          defaultFineAmount={fineSettings.default_fine_amount}
+          weeklyFineIncrement={fineSettings.weekly_fine_increment}
         />
       )}
 

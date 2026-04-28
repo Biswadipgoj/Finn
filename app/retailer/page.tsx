@@ -21,6 +21,7 @@ function fmt(n: number) {
 
 export default function RetailerDashboard() {
   const supabase = createClient();
+  const [fineSettings, setFineSettings] = useState({ default_fine_amount: 450, weekly_fine_increment: 25 });
   const [retailer, setRetailer] = useState<Retailer | null>(null);
   const [searchResults, setSearchResults] = useState<Customer[] | null>(null);
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
@@ -48,7 +49,16 @@ export default function RetailerDashboard() {
 
   useEffect(() => {
     loadRetailerInfo();
+    loadFineSettings();
   }, []);
+
+  async function loadFineSettings() {
+    const { data } = await supabaseRef.current.from('fine_settings').select('default_fine_amount, weekly_fine_increment').eq('id', 1).single();
+    if (data) setFineSettings({
+      default_fine_amount: Number(data.default_fine_amount || 450),
+      weekly_fine_increment: Number(data.weekly_fine_increment || 25),
+    });
+  }
 
   async function loadRetailerInfo() {
     const sb = supabaseRef.current;
@@ -161,7 +171,12 @@ export default function RetailerDashboard() {
     const { data: bd, error: bdErr } = await sb.rpc('get_due_breakdown', { p_customer_id: customer.id });
     if (bdErr) {
       const el = (emis as EMISchedule[]) || []; const nx = el.find(e => e.status === 'UNPAID' || e.status === 'PARTIALLY_PAID');
-      const af = calculateTotalFineFromEmis(el); const fc = customer.first_emi_charge_paid_at ? 0 : (customer.first_emi_charge_amount || 0);
+      const af = calculateTotalFineFromEmis(
+        el,
+        Number(fineSettings.default_fine_amount || 450),
+        Number(fineSettings.weekly_fine_increment || 25),
+      );
+      const fc = customer.first_emi_charge_paid_at ? 0 : (customer.first_emi_charge_amount || 0);
       setBreakdown({ customer_id: customer.id, customer_status: customer.status, next_emi_no: nx?.emi_no, next_emi_amount: nx?.amount, next_emi_due_date: nx?.due_date, next_emi_status: nx?.status, fine_due: af, first_emi_charge_due: fc, total_payable: (nx?.amount ?? 0) + af + fc, popup_first_emi_charge: fc > 0, popup_fine_due: af > 0, is_overdue: nx ? new Date(nx.due_date) < new Date() : false } as DueBreakdown);
     } else setBreakdown(bd as DueBreakdown);
   }
@@ -417,17 +432,30 @@ export default function RetailerDashboard() {
             {selectedCustomer.status === 'RUNNING' ? (() => {
               const hasUnpaidEmis = customerEmis.some(e => e.status === 'UNPAID' || e.status === 'PARTIALLY_PAID');
               return (
-                <div className="flex justify-end">
-                  <button
-                    onClick={() => setShowPaymentModal(true)}
-                    disabled={!hasUnpaidEmis}
-                    className="btn-primary text-base px-8 py-3.5"
-                  >
-                    {!hasUnpaidEmis
-                      ? '✓ All EMIs Paid'
-                      : `💳 Collect EMI #${breakdown?.next_emi_no ?? ''}`}
-                  </button>
-                </div>
+                <>
+                  <div className="hidden sm:flex justify-end">
+                    <button
+                      onClick={() => setShowPaymentModal(true)}
+                      disabled={!hasUnpaidEmis}
+                      className="btn-primary text-base px-8 py-3.5"
+                    >
+                      {!hasUnpaidEmis
+                        ? '✓ All EMIs Paid'
+                        : `💳 Collect EMI #${breakdown?.next_emi_no ?? ''}`}
+                    </button>
+                  </div>
+                  <div className="sm:hidden fixed bottom-16 left-0 right-0 z-30 px-4 pb-[max(env(safe-area-inset-bottom),0px)]">
+                    <button
+                      onClick={() => setShowPaymentModal(true)}
+                      disabled={!hasUnpaidEmis}
+                      className="btn-primary w-full text-base py-3.5 shadow-modal"
+                    >
+                      {!hasUnpaidEmis
+                        ? '✓ All EMIs Paid'
+                        : `💳 Collect EMI #${breakdown?.next_emi_no ?? ''}`}
+                    </button>
+                  </div>
+                </>
               );
             })() : (
               <div className="alert-blue">
@@ -436,7 +464,13 @@ export default function RetailerDashboard() {
               </div>
             )}
 
-            <EMIScheduleTable emis={customerEmis} nextUnpaidNo={breakdown?.next_emi_no ?? undefined} isAdmin={false} />
+            <EMIScheduleTable
+              emis={customerEmis}
+              nextUnpaidNo={breakdown?.next_emi_no ?? undefined}
+              isAdmin={false}
+              defaultFineAmount={fineSettings.default_fine_amount}
+              weeklyFineIncrement={fineSettings.weekly_fine_increment}
+            />
           </div>
         )}
       </div>
@@ -453,6 +487,8 @@ export default function RetailerDashboard() {
             if (retailer) loadMyRequests(retailer.id);
           }}
           isAdmin={false}
+          defaultFineAmount={fineSettings.default_fine_amount}
+          weeklyFineIncrement={fineSettings.weekly_fine_increment}
         />
       )}
       <BottomNav role="retailer" />

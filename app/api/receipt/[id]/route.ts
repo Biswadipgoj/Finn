@@ -202,6 +202,10 @@ export async function GET(
 
       <div class="section-title">Transaction</div>
       <div class="kv"><span class="kv-label">Payment Mode</span><span class="kv-value bold" style="color:${request.mode === 'UPI' ? '#1d4ed8' : '#16a34a'};">${esc(request.mode)}</span></div>
+      <div class="kv"><span class="kv-label">Payment UTR</span><span class="kv-value mono" style="font-size:0.72rem;color:${request.utr ? '#1d4ed8' : '#1e293b'};">${esc(request.utr || '—')}</span></div>
+      ${fineAmount > 0 ? `<div class="kv"><span class="kv-label" style="color:#991b1b;">Fine Payment Date</span><span class="kv-value mono" style="font-size:0.72rem;color:#991b1b;">${fmtDate(request.approved_at || request.created_at)}</span></div>` : ''}
+      ${fineAmount > 0 ? `<div class="kv"><span class="kv-label" style="color:#991b1b;">Fine Method</span><span class="kv-value bold" style="color:${request.mode === 'UPI' ? '#1d4ed8' : '#16a34a'};">${esc(request.mode || '—')}</span></div>` : ''}
+      ${fineAmount > 0 ? `<div class="kv"><span class="kv-label" style="color:#991b1b;">Fine UTR</span><span class="kv-value mono" style="font-size:0.72rem;color:${request.utr ? '#1d4ed8' : '#1e293b'};">${esc(request.utr || '—')}</span></div>` : ''}
       <div class="kv"><span class="kv-label">Date & Time</span><span class="kv-value mono" style="font-size:0.72rem;">${fmtDate(request.created_at)}</span></div>
       <div class="kv"><span class="kv-label">Status</span><span class="kv-value bold" style="color:${statusColor};">${esc(statusLabel)}</span></div>
       ${request.approved_at ? `<div class="kv"><span class="kv-label">Approved</span><span class="kv-value mono" style="font-size:0.72rem;">${fmtDate(request.approved_at)}</span></div>` : ''}
@@ -231,5 +235,4 @@ export async function GET(
     },
   });
 }
-
 
