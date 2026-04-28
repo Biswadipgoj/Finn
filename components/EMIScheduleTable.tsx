@@ -38,6 +38,20 @@ export default function EMIScheduleTable({ emis, isAdmin, nextUnpaidNo, onRefres
 
   const paidCount = sortedEmis.filter(e => e.status === 'APPROVED').length;
 
+  function startEdit(emi: EMISchedule) {
+    setEditingId(emi.id);
+    setEditForm({
+      due_date: emi.due_date || '',
+      amount: String(emi.amount || 0),
+      fine_amount: String(emi.fine_amount || 0),
+      status: emi.status,
+      paid_at: emi.paid_at ? emi.paid_at.split('T')[0] : '',
+      mode: emi.mode || '',
+      utr: emi.utr || '',
+      fine_paid_at: emi.fine_paid_at ? emi.fine_paid_at.split('T')[0] : '',
+    });
+  }
+
   async function saveEdit(emi: EMISchedule) {
     if (fineOverride === '' && dateOverride === '') {
       toast.error('No changes to save');
@@ -227,9 +241,6 @@ export default function EMIScheduleTable({ emis, isAdmin, nextUnpaidNo, onRefres
                       />
                     ) : (emi.fine_paid_at ? formatDateOnly(emi.fine_paid_at) : '\u2014')}
                   </td>
-                  <td className="text-xs text-ink-muted">{emi.mode || '\u2014'}</td>
-                  <td className="num text-xs text-ink-muted break-all">{emi.utr || '\u2014'}</td>
-                  <td className="num text-xs text-ink-muted">{emi.fine_paid_at ? formatDateOnly(emi.fine_paid_at) : '\u2014'}</td>
                   {isAdmin && (
                     <td className="text-right">
                       {editing ? (

@@ -845,7 +845,7 @@ export default function AdminDashboard() {
                   <input
                     type="number"
                     value={fineSettings.weekly_fine_increment}
-                    onChange={(e) => setFineSettings((f) => ({ ...f, weekly_fine_increment: parseFloat(e.target.value) }))}
+                    onChange={(e) => setFineSettings((f) => ({ ...f, weekly_fine_increment: Number(e.target.value) || 0 }))}
                     className="form-input"
                     min={0}
                   />
