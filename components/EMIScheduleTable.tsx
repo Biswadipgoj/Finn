@@ -30,6 +30,10 @@ export default function EMIScheduleTable({ emis, isAdmin, nextUnpaidNo, onRefres
   const paidCount = sortedEmis.filter(e => e.status === 'APPROVED').length;
 
   async function saveEdit(emi: EMISchedule) {
+    if (fineOverride === '' && dateOverride === '') {
+      toast.error('No changes to save');
+      return;
+    }
     setSaving(true);
     const updates: Record<string, unknown> = {};
     if (fineOverride !== '') updates.fine_amount = parseFloat(fineOverride) || 0;
@@ -161,7 +165,7 @@ export default function EMIScheduleTable({ emis, isAdmin, nextUnpaidNo, onRefres
                       ) : (
                         <div className="flex items-center gap-1 justify-end">
                           <button
-                            onClick={() => { setEditingId(emi.id); setFineOverride(''); setDateOverride(''); }}
+                            onClick={() => { setEditingId(emi.id); setFineOverride(String(emi.fine_amount || 0)); setDateOverride(emi.due_date || ''); }}
                             className="btn-ghost text-xs px-2 py-1"
                           >{'\u270F'}</button>
                         </div>
@@ -192,20 +196,41 @@ export default function EMIScheduleTable({ emis, isAdmin, nextUnpaidNo, onRefres
             finePaid > 0 && fineRemaining > 0 ? 'Partially Paid' :
             fineRemaining === 0 && displayFine > 0 ? 'Paid' :
             displayFine > 0 ? 'Due' : '—';
+          const editing = editingId === emi.id;
           return (
             <div key={emi.id} className={`p-4 space-y-3 ${isOverdue ? 'bg-danger-light/40 border-l-4 border-danger' : isNext ? 'bg-brand-50/60 border-l-4 border-brand-500' : 'bg-white'}`}>
               <div className="flex items-center justify-between gap-2">
                 <p className="font-semibold text-ink">EMI #{emi.emi_no}</p>
-                {emi.status === 'APPROVED' && <span className="badge-blue">✓ Paid</span>}
-                {emi.status === 'PARTIALLY_PAID' && <span className="badge-yellow">Partial</span>}
-                {emi.status === 'PENDING_APPROVAL' && <span className="badge-yellow">⏳ Pending</span>}
-                {emi.status === 'UNPAID' && <span className={`badge ${isOverdue ? 'badge-red' : 'badge-gray'}`}>{isOverdue ? 'Overdue' : 'Unpaid'}</span>}
+                <div className="flex items-center gap-2">
+                  {emi.status === 'APPROVED' && <span className="badge-blue">✓ Paid</span>}
+                  {emi.status === 'PARTIALLY_PAID' && <span className="badge-yellow">Partial</span>}
+                  {emi.status === 'PENDING_APPROVAL' && <span className="badge-yellow">⏳ Pending</span>}
+                  {emi.status === 'UNPAID' && <span className={`badge ${isOverdue ? 'badge-red' : 'badge-gray'}`}>{isOverdue ? 'Overdue' : 'Unpaid'}</span>}
+                  {isAdmin && !editing && (
+                    <button
+                      onClick={() => { setEditingId(emi.id); setFineOverride(String(emi.fine_amount || 0)); setDateOverride(emi.due_date || ''); }}
+                      className="btn-ghost text-xs px-2 py-1"
+                    >
+                      ✏ Edit
+                    </button>
+                  )}
+                </div>
               </div>
               <div className="grid grid-cols-2 gap-2 text-xs">
-                <p className="text-ink-muted">Due Date</p><p className="text-right num font-semibold">{format(dueDate, 'd MMM yyyy')}</p>
+                <p className="text-ink-muted">Due Date</p>
+                <p className="text-right num font-semibold">
+                  {editing ? (
+                    <input type="date" value={dateOverride || emi.due_date} onChange={e => setDateOverride(e.target.value)} className="input py-1 px-2 text-xs w-full" />
+                  ) : format(dueDate, 'd MMM yyyy')}
+                </p>
                 <p className="text-ink-muted">EMI Amount</p><p className="text-right num font-semibold text-brand-700">{fmt(emi.amount)}</p>
                 {emi.status === 'PARTIALLY_PAID' && <><p className="text-ink-muted">EMI Paid</p><p className="text-right num text-success font-semibold">{fmt(emiPaidAmount)}</p><p className="text-ink-muted">EMI Remaining</p><p className="text-right num text-warning font-semibold">{fmt(emiRemaining)}</p></>}
-                <p className="text-ink-muted">Remaining Fine</p><p className="text-right num font-semibold text-danger">{displayFine > 0 ? fmt(fineRemaining > 0 ? fineRemaining : displayFine) : '—'}</p>
+                <p className="text-ink-muted">Remaining Fine</p>
+                <p className="text-right num font-semibold text-danger">
+                  {editing ? (
+                    <input type="number" value={fineOverride} onChange={e => setFineOverride(e.target.value)} min={0} className="input py-1 px-2 text-xs w-full" />
+                  ) : (displayFine > 0 ? fmt(fineRemaining > 0 ? fineRemaining : displayFine) : '—')}
+                </p>
                 <p className="text-ink-muted">Fine Status</p><p className={`text-right font-semibold ${fineStatus === 'Paid' ? 'text-success' : fineStatus === 'Due' ? 'text-danger' : 'text-warning'}`}>{fineStatus}</p>
                 <p className="text-ink-muted">Payment Date</p><p className="text-right num">{emi.paid_at ? formatDateOnly(emi.paid_at) : emi.partial_paid_at ? `${formatDateOnly(emi.partial_paid_at)} (partial)` : '—'}</p>
                 <p className="text-ink-muted">Payment Method</p><p className={`text-right font-semibold ${emi.mode === 'UPI' ? 'text-info' : emi.mode === 'CASH' ? 'text-success' : 'text-ink-muted'}`}>{emi.mode || '—'}</p>
@@ -214,6 +239,12 @@ export default function EMIScheduleTable({ emis, isAdmin, nextUnpaidNo, onRefres
                 <p className="text-ink-muted">Fine Method</p><p className={`text-right font-semibold ${finePaid > 0 && emi.mode === 'UPI' ? 'text-info' : finePaid > 0 && emi.mode === 'CASH' ? 'text-success' : 'text-ink-muted'}`}>{finePaid > 0 ? (emi.mode || '—') : '—'}</p>
                 <p className="text-ink-muted">Fine UTR</p><p className="text-right num break-all">{finePaid > 0 ? (emi.utr || '—') : '—'}</p>
               </div>
+              {isAdmin && editing && (
+                <div className="flex gap-2">
+                  <button onClick={() => saveEdit(emi)} disabled={saving} className="btn-success text-xs px-3 py-2 flex-1">{saving ? '…' : 'Save'}</button>
+                  <button onClick={() => setEditingId(null)} className="btn-secondary text-xs px-3 py-2 flex-1">Cancel</button>
+                </div>
+              )}
             </div>
           );
         })}
