@@ -417,17 +417,30 @@ export default function RetailerDashboard() {
             {selectedCustomer.status === 'RUNNING' ? (() => {
               const hasUnpaidEmis = customerEmis.some(e => e.status === 'UNPAID' || e.status === 'PARTIALLY_PAID');
               return (
-                <div className="flex justify-end">
-                  <button
-                    onClick={() => setShowPaymentModal(true)}
-                    disabled={!hasUnpaidEmis}
-                    className="btn-primary text-base px-8 py-3.5"
-                  >
-                    {!hasUnpaidEmis
-                      ? '✓ All EMIs Paid'
-                      : `💳 Collect EMI #${breakdown?.next_emi_no ?? ''}`}
-                  </button>
-                </div>
+                <>
+                  <div className="hidden sm:flex justify-end">
+                    <button
+                      onClick={() => setShowPaymentModal(true)}
+                      disabled={!hasUnpaidEmis}
+                      className="btn-primary text-base px-8 py-3.5"
+                    >
+                      {!hasUnpaidEmis
+                        ? '✓ All EMIs Paid'
+                        : `💳 Collect EMI #${breakdown?.next_emi_no ?? ''}`}
+                    </button>
+                  </div>
+                  <div className="sm:hidden fixed bottom-16 left-0 right-0 z-30 px-4 pb-[max(env(safe-area-inset-bottom),0px)]">
+                    <button
+                      onClick={() => setShowPaymentModal(true)}
+                      disabled={!hasUnpaidEmis}
+                      className="btn-primary w-full text-base py-3.5 shadow-modal"
+                    >
+                      {!hasUnpaidEmis
+                        ? '✓ All EMIs Paid'
+                        : `💳 Collect EMI #${breakdown?.next_emi_no ?? ''}`}
+                    </button>
+                  </div>
+                </>
               );
             })() : (
               <div className="alert-blue">
