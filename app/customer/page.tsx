@@ -18,6 +18,7 @@ interface CustomerSession {
   customer: Customer;
   emis: EMISchedule[];
   breakdown: DueBreakdown | null;
+  fine_settings?: { default_fine_amount?: number; weekly_fine_increment?: number } | null;
 }
 
 interface MultiLoanEntry {
@@ -45,6 +46,7 @@ export default function CustomerPortal() {
   const [dismissedBroadcasts, setDismissedBroadcasts] = useState<Set<string>>(new Set());
   const [isLaunchingUpi, setIsLaunchingUpi] = useState(false);
   const [pendingWhatsappShare, setPendingWhatsappShare] = useState(false);
+  const [fineSettings, setFineSettings] = useState({ default_fine_amount: 450, weekly_fine_increment: 25 });
 
   // Restore session from localStorage OR auto-login via token
   useEffect(() => {
@@ -61,9 +63,15 @@ export default function CustomerPortal() {
         .then((data: any) => {
           if (data?.customer) {
             const newSession: CustomerSession = {
-              customer: data.customer, emis: data.emis || [], breakdown: data.breakdown || null,
+              customer: data.customer, emis: data.emis || [], breakdown: data.breakdown || null, fine_settings: data.fine_settings || null,
             };
             setSession(newSession);
+            if (data?.fine_settings) {
+              setFineSettings({
+                default_fine_amount: Number(data.fine_settings.default_fine_amount || 450),
+                weekly_fine_increment: Number(data.fine_settings.weekly_fine_increment || 25),
+              });
+            }
             localStorage.setItem(SESSION_KEY, JSON.stringify(newSession));
             localStorage.setItem(TOKEN_KEY, tokenToUse); // persist for future auto-login
             if (data?.broadcasts?.length) setBroadcastMessages(data.broadcasts);
@@ -123,7 +131,7 @@ export default function CustomerPortal() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ aadhaar: aadhaar || undefined, mobile: mobile || undefined }),
       });
-      const data = await readJsonSafe<{ error?: string; customer?: unknown; emis?: unknown[]; breakdown?: unknown; multi?: boolean; customers?: unknown[]; broadcasts?: unknown[] }>(res) || {};
+      const data = await readJsonSafe<{ error?: string; customer?: unknown; emis?: unknown[]; breakdown?: unknown; multi?: boolean; customers?: unknown[]; broadcasts?: unknown[]; fine_settings?: { default_fine_amount?: number; weekly_fine_increment?: number } }>(res) || {};
       if (!res.ok) { toast.error(data.error); return; }
 
       // Multi-loan: show selection list
@@ -136,8 +144,15 @@ export default function CustomerPortal() {
         customer: data.customer,
         emis: data.emis,
         breakdown: data.breakdown,
+        fine_settings: data.fine_settings || null,
       };
       setSession(newSession);
+      if (data.fine_settings) {
+        setFineSettings({
+          default_fine_amount: Number(data.fine_settings.default_fine_amount || 450),
+          weekly_fine_increment: Number(data.fine_settings.weekly_fine_increment || 25),
+        });
+      }
       if (data.broadcasts?.length) setBroadcastMessages(data.broadcasts);
       localStorage.setItem(SESSION_KEY, JSON.stringify(newSession));
     } catch {
@@ -159,14 +174,21 @@ export default function CustomerPortal() {
           mobile: mobile || undefined,
         }),
       });
-      const data = await readJsonSafe<{ error?: string; customer?: unknown; emis?: unknown[]; breakdown?: unknown; multi?: boolean; customers?: unknown[]; broadcasts?: unknown[] }>(res) || {};
+      const data = await readJsonSafe<{ error?: string; customer?: unknown; emis?: unknown[]; breakdown?: unknown; multi?: boolean; customers?: unknown[]; broadcasts?: unknown[]; fine_settings?: { default_fine_amount?: number; weekly_fine_increment?: number } }>(res) || {};
       if (!res.ok) { toast.error(data.error); return; }
       const newSession: CustomerSession = {
         customer: data.customer,
         emis: data.emis,
         breakdown: data.breakdown,
+        fine_settings: data.fine_settings || null,
       };
       setSession(newSession);
+      if (data.fine_settings) {
+        setFineSettings({
+          default_fine_amount: Number(data.fine_settings.default_fine_amount || 450),
+          weekly_fine_increment: Number(data.fine_settings.weekly_fine_increment || 25),
+        });
+      }
       setMultiLoans(null);
       if (data.broadcasts?.length) setBroadcastMessages(data.broadcasts);
       localStorage.setItem(SESSION_KEY, JSON.stringify(newSession));
@@ -622,6 +644,12 @@ export default function CustomerPortal() {
                         Due: {format(new Date(emi.due_date), 'd MMM yyyy')}
                         {isOverdue && ' — OVERDUE'}
                       </p>
+                      <p className="text-[11px] text-slate-500">
+                        EMI Paid: {emi.paid_at ? formatDateOnly(emi.paid_at) : emi.partial_paid_at ? `${formatDateOnly(emi.partial_paid_at)} (partial)` : '—'} · UTR: {emi.utr || '—'}
+                      </p>
+                      <p className="text-[11px] text-slate-500">
+                        Fine Paid: {emi.fine_paid_at ? formatDateOnly(emi.fine_paid_at) : '—'} · Fine UTR: {emi.fine_paid_amount ? (emi.utr || '—') : '—'}
+                      </p>
                     </div>
                   </div>
                   <div className="text-right">
@@ -662,7 +690,11 @@ export default function CustomerPortal() {
 
         {/* Fine Breakdown */}
         {(() => {
-          const fb = getPerEmiFineBreakdown(sortedEmis);
+          const fb = getPerEmiFineBreakdown(
+            sortedEmis,
+            Number(fineSettings.default_fine_amount || 450),
+            Number(fineSettings.weekly_fine_increment || 25),
+          );
           if (!fb.length) return null;
           return (
             <div className="card overflow-hidden">
@@ -672,13 +704,13 @@ export default function CustomerPortal() {
                   <div key={r.emi_no} className="px-5 py-3 space-y-1">
                     <div className="flex justify-between"><span className="text-sm font-medium text-ink">EMI #{r.emi_no}</span><span className="text-xs text-crimson-400 font-semibold">{r.days}d overdue</span></div>
                     <div className="flex justify-between text-xs text-slate-500"><span>Base Fine</span><span className="font-num">{fmt(r.baseFineTotal)}</span></div>
-                    {r.weeklyFine > 0 && <div className="flex justify-between text-xs text-slate-500"><span>+₹25/wk</span><span className="font-num">{fmt(r.weeklyFine)}</span></div>}
+                    {r.weeklyFine > 0 && <div className="flex justify-between text-xs text-slate-500"><span>+₹{fineSettings.weekly_fine_increment}/wk</span><span className="font-num">{fmt(r.weeklyFine)}</span></div>}
                     <div className="flex justify-between text-sm font-semibold"><span className="text-crimson-400">Total</span><span className="font-num text-crimson-400">{fmt(r.totalFine)}</span></div>
                     {r.paid > 0 && <div className="flex justify-between text-xs"><span className="text-jade-400">Paid{(() => { const e = sortedEmis.find(x => x.emi_no === r.emi_no); return e?.fine_paid_at ? ` (${new Date(e.fine_paid_at).toLocaleDateString('en-IN', {day:'numeric',month:'short'})})` : ''; })()}</span><span className="font-num text-jade-400">-{fmt(r.paid)}</span></div>}
                   </div>
                 ))}
               </div>
-              <div className="px-5 py-3 border-t border-surface-4"><p className="text-[11px] text-slate-600">₹450 base + ₹25/week until paid. Contact retailer.</p></div>
+              <div className="px-5 py-3 border-t border-surface-4"><p className="text-[11px] text-slate-600">₹{fineSettings.default_fine_amount} base + ₹{fineSettings.weekly_fine_increment}/week until paid. Contact retailer.</p></div>
             </div>
           );
         })()}

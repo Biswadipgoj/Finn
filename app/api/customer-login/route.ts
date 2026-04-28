@@ -33,7 +33,13 @@ async function buildCustomerPayload(serviceClient: ReturnType<typeof createServi
     .gt('expires_at', new Date().toISOString())
     .order('created_at', { ascending: false });
 
-  return { customer, emis: emis || [], breakdown, broadcasts: broadcasts || [] };
+  const { data: fineSettings } = await serviceClient
+    .from('fine_settings')
+    .select('default_fine_amount, weekly_fine_increment')
+    .eq('id', 1)
+    .single();
+
+  return { customer, emis: emis || [], breakdown, broadcasts: broadcasts || [], fine_settings: fineSettings || null };
 }
 
 export async function POST(req: NextRequest) {

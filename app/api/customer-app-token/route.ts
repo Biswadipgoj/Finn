@@ -95,7 +95,17 @@ export async function GET(req: NextRequest) {
     .gte('expires_at', new Date().toISOString())
     .order('created_at', { ascending: false });
 
+  const { data: fineSettings } = await svc
+    .from('fine_settings')
+    .select('default_fine_amount, weekly_fine_increment')
+    .eq('id', 1)
+    .single();
+
   return NextResponse.json({
-    customer, emis: emis || [], breakdown: breakdown || null, broadcasts: broadcasts || [],
+    customer,
+    emis: emis || [],
+    breakdown: breakdown || null,
+    broadcasts: broadcasts || [],
+    fine_settings: fineSettings || null,
   });
 }

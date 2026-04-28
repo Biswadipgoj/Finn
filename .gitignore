@@ -2,6 +2,10 @@ node_modules
 .next
 out
 dist
+coverage
+.turbo
+.cache
+logs
 .env
 .env.local
 .env.*.local
