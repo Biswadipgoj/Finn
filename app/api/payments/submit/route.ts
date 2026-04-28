@@ -38,7 +38,7 @@ export async function POST(req: NextRequest) {
   if (!noEmi && emi_ids?.length) {
     const { data: ch } = await svc
       .from('emi_schedule')
-      .select('id, status, emi_no')
+      .select('id, status')
       .in('id', emi_ids)
       .eq('customer_id', customer_id);
 
@@ -47,19 +47,6 @@ export async function POST(req: NextRequest) {
     }
     if ((ch || []).some(e => e.status === 'APPROVED' || e.status === 'PENDING_APPROVAL')) {
       return NextResponse.json({ error: 'EMI already pending or fully paid' }, { status: 409 });
-    }
-
-    const { data: nextDue } = await svc
-      .from('emi_schedule')
-      .select('id, emi_no')
-      .eq('customer_id', customer_id)
-      .in('status', ['UNPAID', 'PARTIALLY_PAID'])
-      .order('emi_no', { ascending: true })
-      .limit(1)
-      .single();
-
-    if (nextDue && !emi_ids.includes(nextDue.id)) {
-      return NextResponse.json({ error: `Waterfall rule: collect EMI #${nextDue.emi_no} before later installments.` }, { status: 409 });
     }
   }
 

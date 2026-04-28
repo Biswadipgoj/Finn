@@ -16,8 +16,6 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  const isApiRoute = pathname.startsWith('/api/');
-
   let response = NextResponse.next({ request });
 
   const supabase = createServerClient(
@@ -38,9 +36,6 @@ export async function middleware(request: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser();
 
   if (!user) {
-    if (isApiRoute) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
     const url = request.nextUrl.clone();
     url.pathname = '/login';
     return NextResponse.redirect(url);

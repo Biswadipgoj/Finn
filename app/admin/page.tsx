@@ -887,7 +887,7 @@ export default function AdminDashboard() {
               {/* Monthly Collection Sheet */}
               <div className="card p-5 mb-6">
                 <p className="section-header">📋 Monthly Collection Sheet</p>
-                <p className="text-xs text-ink-muted mb-4">Download the retailer-wise monthly collection sheet for running customers as CSV with retailer name mapping and current due fine.</p>
+                <p className="text-xs text-ink-muted mb-4">Download the retailer-wise monthly collection sheet for running customers with centered retailer headers and colour.</p>
                 <div className="flex flex-wrap items-end gap-3">
                   <div>
                     <label className="label">Month</label>
@@ -905,10 +905,10 @@ export default function AdminDashboard() {
                   </div>
                   <a
                     href={'/api/report/monthly?month=' + reportMonth + '&year=' + reportYear}
-                    download="monthly-collection.csv"
+                    download="monthly-collection.xlsx"
                     className="btn-primary"
                   >
-                    📥 Download CSV
+                    📥 Download Excel
                   </a>
                 </div>
               </div>
@@ -1275,7 +1275,6 @@ export default function AdminDashboard() {
           onClose={() => setShowPaymentModal(false)}
           onSubmitted={async () => { await refreshSelectedCustomer(); loadPendingCount(); }}
           isAdmin={true}
-          superAdminBypass={true}
           defaultFineAmount={fineSettings.default_fine_amount}
           weeklyFineIncrement={fineSettings.weekly_fine_increment}
         />
