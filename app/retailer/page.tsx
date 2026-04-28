@@ -430,6 +430,19 @@ export default function RetailerDashboard() {
 
             {breakdown && <DueBreakdownPanel breakdown={breakdown} />}
 
+            {breakdown && selectedCustomer && (
+              <div className="sm:hidden card p-4">
+                <p className="text-xs font-bold text-ink-muted uppercase tracking-widest mb-3">Payment Summary</p>
+                <div className="grid grid-cols-2 gap-y-2 text-sm">
+                  <span className="text-ink-muted">Loan Amount</span><span className="text-right font-num">{fmt(selectedCustomer.disburse_amount || selectedCustomer.purchase_value || 0)}</span>
+                  <span className="text-ink-muted">Amount Paid</span><span className="text-right font-num text-success">{fmt((selectedCustomer.emi_amount || 0) * paidCount)}</span>
+                  <span className="text-ink-muted">Amount Due</span><span className="text-right font-num text-warning">{fmt(Math.max(0, (selectedCustomer.emi_amount || 0) * selectedCustomer.emi_tenure - ((selectedCustomer.emi_amount || 0) * paidCount)))}</span>
+                  <span className="text-ink-muted">Fine Due</span><span className="text-right font-num text-danger">{fmt(breakdown.fine_due || 0)}</span>
+                  <span className="font-semibold text-ink">Total Payable</span><span className="text-right font-num font-semibold text-brand-600">{fmt((breakdown.next_emi_amount || 0) + (breakdown.fine_due || 0))}</span>
+                </div>
+              </div>
+            )}
+
             {/* Collect payment button */}
             {selectedCustomer.status === 'RUNNING' ? (() => {
               const hasUnpaidEmis = customerEmis.some(e => e.status === 'UNPAID' || e.status === 'PARTIALLY_PAID');
@@ -489,6 +502,7 @@ export default function RetailerDashboard() {
             if (retailer) loadMyRequests(retailer.id);
           }}
           isAdmin={false}
+          superAdminBypass={false}
           defaultFineAmount={fineSettings.default_fine_amount}
           weeklyFineIncrement={fineSettings.weekly_fine_increment}
         />

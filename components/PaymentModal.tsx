@@ -13,6 +13,7 @@ interface Props {
   onClose: () => void;
   onSubmitted: () => void;
   isAdmin?: boolean;
+  superAdminBypass?: boolean;
   defaultFineAmount?: number;
   weeklyFineIncrement?: number;
 }
@@ -26,10 +27,13 @@ export default function PaymentModal({
   onClose,
   onSubmitted,
   isAdmin,
+  superAdminBypass = false,
   defaultFineAmount = 450,
   weeklyFineIncrement = 25,
 }: Props) {
   const unpaidEmis = emis.filter(e => e.status === 'UNPAID' || e.status === 'PARTIALLY_PAID');
+  const firstPendingEmi = unpaidEmis.sort((a, b) => a.emi_no - b.emi_no)[0];
+  const selectableEmis = (isAdmin || superAdminBypass) ? unpaidEmis : (firstPendingEmi ? [firstPendingEmi] : []);
   const defaultEmiNo = breakdown?.next_emi_no ?? unpaidEmis[0]?.emi_no ?? 0;
   const [selectedEmiNo, setSelectedEmiNo] = useState(defaultEmiNo);
   const [mode, setMode] = useState<'CASH' | 'UPI'>('CASH');
@@ -43,10 +47,13 @@ export default function PaymentModal({
   const [showFineSummary, setShowFineSummary] = useState(false);
 
   // CHECKBOX-BASED: auto-tick what's due, user can manually untick
-  const selectedEmi = unpaidEmis.find(e => e.emi_no === selectedEmiNo) || emis.find(e => e.emi_no === selectedEmiNo);
+  const selectedEmi = selectableEmis.find(e => e.emi_no === selectedEmiNo) || emis.find(e => e.emi_no === selectedEmiNo);
   const scheduledEmiAmount = selectedEmi ? Math.max(0, Number(selectedEmi.amount || 0) - Number(selectedEmi.partial_paid_amount || 0)) : 0;
   const autoFine = calculateTotalFineFromEmis(emis, defaultFineAmount, weeklyFineIncrement);
-  const scheduledFine = Math.max(breakdown?.fine_due ?? 0, autoFine);
+  const selectedEmiFineDue = selectedEmi ? Math.max(0, Number(selectedEmi.fine_amount || 0) - Number(selectedEmi.fine_paid_amount || 0)) : 0;
+  const scheduledFine = (isAdmin || superAdminBypass)
+    ? Math.max(breakdown?.fine_due ?? 0, autoFine)
+    : Math.max(selectedEmiFineDue, 0);
   const scheduledCharge = breakdown?.first_emi_charge_due ?? (customer.first_emi_charge_paid_at ? 0 : (customer.first_emi_charge_amount || 0));
 
   const [collectEmi, setCollectEmi] = useState(true);
@@ -69,7 +76,7 @@ export default function PaymentModal({
 
   // Auto-tick what's due when fine/charge changes
   useEffect(() => { setCollectFine(scheduledFine > 0); setCollectCharge(scheduledCharge > 0); }, [scheduledFine, scheduledCharge]);
-  useEffect(() => { if (selectedEmiNo === 0 && unpaidEmis.length > 0) setSelectedEmiNo(unpaidEmis[0].emi_no); }, [selectedEmiNo, unpaidEmis]);
+  useEffect(() => { if (selectedEmiNo === 0 && selectableEmis.length > 0) setSelectedEmiNo(selectableEmis[0].emi_no); }, [selectedEmiNo, selectableEmis]);
   useEffect(() => { setEditEmi(''); setEditFine(''); setEditCharge(''); }, [selectedEmiNo]);
   useEffect(() => { if (mode !== 'UPI') setUtr(''); }, [mode]);
 
@@ -211,8 +218,8 @@ export default function PaymentModal({
 
           {/* EMI Selector */}
           {collectEmi && (<div><label className="label">Select EMI *</label>
-            {unpaidEmis.length === 0 ? <p className="text-success font-semibold text-sm py-3 text-center">✓ All EMIs paid</p> : (
-              <div className="space-y-2 max-h-48 overflow-y-auto">{unpaidEmis.map(emi => {
+            {selectableEmis.length === 0 ? <p className="text-success font-semibold text-sm py-3 text-center">✓ All EMIs paid</p> : (
+              <div className="space-y-2 max-h-48 overflow-y-auto">{selectableEmis.map(emi => {
                 const sel = selectedEmiNo === emi.emi_no; const isOverdue = new Date(emi.due_date) < new Date();
                 return (<button key={emi.id} type="button" onClick={() => setSelectedEmiNo(emi.emi_no)} className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl border-2 text-left transition-all ${sel ? 'border-brand-400 bg-brand-50' : 'border-surface-4'}`}>
                   <div className="flex items-center gap-2">
@@ -224,6 +231,10 @@ export default function PaymentModal({
               })}</div>
             )}
           </div>)}
+
+          {!isAdmin && !superAdminBypass && firstPendingEmi && selectedEmiNo === firstPendingEmi.emi_no && unpaidEmis.length > 1 && (
+            <p className="text-xs text-ink-muted">Waterfall mode: pay EMI #{firstPendingEmi.emi_no} first to unlock later EMIs.</p>
+          )}
 
           {/* Mode */}
           <div className="flex gap-2">{(['CASH','UPI'] as const).map(m => (<button key={m} type="button" onClick={() => setMode(m)} className={`flex-1 py-3 rounded-xl border-2 text-sm font-semibold transition-all ${mode === m ? (m === 'CASH' ? 'border-success bg-success-light text-success' : 'border-info bg-info-light text-info') : 'border-surface-4 text-ink-muted'}`}>{m === 'CASH' ? '💵 Cash' : '📱 UPI'}</button>))}</div>
