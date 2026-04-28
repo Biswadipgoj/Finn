@@ -14,11 +14,12 @@ interface Props {
   nextUnpaidNo?: number;
   onRefresh?: () => void;
   defaultFineAmount?: number;
+  weeklyFineIncrement?: number;
 }
 
 const fmt = formatCurrency;
 
-export default function EMIScheduleTable({ emis, isAdmin, nextUnpaidNo, onRefresh, defaultFineAmount = 450 }: Props) {
+export default function EMIScheduleTable({ emis, isAdmin, nextUnpaidNo, onRefresh, defaultFineAmount = 450, weeklyFineIncrement = 25 }: Props) {
   const supabase = createClient();
   const [editingId, setEditingId] = useState<string | null>(null);
   const [fineOverride, setFineOverride] = useState('');
@@ -60,6 +61,8 @@ export default function EMIScheduleTable({ emis, isAdmin, nextUnpaidNo, onRefres
               <th>Status</th>
               <th>Paid On</th>
               <th>Mode</th>
+              <th>UTR</th>
+              <th>Fine Paid On</th>
               {isAdmin && <th className="text-right">Actions</th>}
             </tr>
           </thead>
@@ -74,7 +77,7 @@ export default function EMIScheduleTable({ emis, isAdmin, nextUnpaidNo, onRefres
               // Fine: show fine_amount if set, else default if overdue
               const maxEmiNo = sortedEmis.length > 0 ? Math.max(...sortedEmis.map(e => e.emi_no)) : 0;
               const isLastEmi = emi.emi_no === maxEmiNo; // position-based, not status-based
-              const autoFine = isOverdue ? calculateSingleEmiFine(emi.due_date, isLastEmi, defaultFineAmount) : 0;
+              const autoFine = isOverdue ? calculateSingleEmiFine(emi.due_date, isLastEmi, defaultFineAmount, weeklyFineIncrement) : 0;
               const displayFine = Math.max(autoFine, emi.fine_amount || 0);
               const emiPaidAmount = Math.max(0, Number(emi.partial_paid_amount || 0));
               const emiRemaining = Math.max(0, Number(emi.amount || 0) - emiPaidAmount);
@@ -144,6 +147,8 @@ export default function EMIScheduleTable({ emis, isAdmin, nextUnpaidNo, onRefres
                     {emi.paid_at ? formatDateOnly(emi.paid_at) : emi.partial_paid_at ? `${formatDateOnly(emi.partial_paid_at)} (partial)` : '—'}
                   </td>
                   <td className="text-xs text-ink-muted">{emi.mode || '\u2014'}</td>
+                  <td className="num text-xs text-ink-muted break-all">{emi.utr || '\u2014'}</td>
+                  <td className="num text-xs text-ink-muted">{emi.fine_paid_at ? formatDateOnly(emi.fine_paid_at) : '\u2014'}</td>
                   {isAdmin && (
                     <td className="text-right">
                       {editing ? (
@@ -155,12 +160,10 @@ export default function EMIScheduleTable({ emis, isAdmin, nextUnpaidNo, onRefres
                         </div>
                       ) : (
                         <div className="flex items-center gap-1 justify-end">
-                          {emi.status === 'UNPAID' && (
-                            <button
-                              onClick={() => { setEditingId(emi.id); setFineOverride(''); setDateOverride(''); }}
-                              className="btn-ghost text-xs px-2 py-1"
-                            >{'\u270F'}</button>
-                          )}
+                          <button
+                            onClick={() => { setEditingId(emi.id); setFineOverride(''); setDateOverride(''); }}
+                            className="btn-ghost text-xs px-2 py-1"
+                          >{'\u270F'}</button>
                         </div>
                       )}
                     </td>
@@ -179,7 +182,7 @@ export default function EMIScheduleTable({ emis, isAdmin, nextUnpaidNo, onRefres
           const isNext = emi.emi_no === nextUnpaidNo;
           const maxEmiNo = sortedEmis.length > 0 ? Math.max(...sortedEmis.map(e => e.emi_no)) : 0;
           const isLastEmi = emi.emi_no === maxEmiNo;
-          const autoFine = isOverdue ? calculateSingleEmiFine(emi.due_date, isLastEmi, defaultFineAmount) : 0;
+          const autoFine = isOverdue ? calculateSingleEmiFine(emi.due_date, isLastEmi, defaultFineAmount, weeklyFineIncrement) : 0;
           const displayFine = Math.max(autoFine, emi.fine_amount || 0);
           const emiPaidAmount = Math.max(0, Number(emi.partial_paid_amount || 0));
           const emiRemaining = Math.max(0, Number(emi.amount || 0) - emiPaidAmount);

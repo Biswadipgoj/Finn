@@ -5,8 +5,18 @@ import { format } from 'date-fns';
 
 function fmt(n: number) { return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', minimumFractionDigits: 0 }).format(n); }
 
-export default function FineSummaryPanel({ emis, onClose }: { emis: EMISchedule[]; onClose: () => void }) {
-  const rows = getPerEmiFineBreakdown(emis);
+export default function FineSummaryPanel({
+  emis,
+  onClose,
+  defaultFineAmount = 450,
+  weeklyFineIncrement = 25,
+}: {
+  emis: EMISchedule[];
+  onClose: () => void;
+  defaultFineAmount?: number;
+  weeklyFineIncrement?: number;
+}) {
+  const rows = getPerEmiFineBreakdown(emis, defaultFineAmount, weeklyFineIncrement);
   const totalRemaining = rows.reduce((s, r) => s + r.remaining, 0);
   const totalPaid = rows.reduce((s, r) => s + r.paid, 0);
   return (
@@ -41,7 +51,7 @@ export default function FineSummaryPanel({ emis, onClose }: { emis: EMISchedule[
                 <div className="text-xs text-ink-muted">Due: {format(new Date(r.due_date), 'd MMM yyyy')} · Weekly starts: {format(new Date(r.graceEnds), 'd MMM yyyy')}</div>
                 <div className="h-px bg-surface-4" />
                 <div className="flex justify-between text-xs"><span className="text-ink-muted">Base Fine{r.isLastEmi ? ' (repeating)' : ''}</span><span className="num">{fmt(r.baseFineTotal)}</span></div>
-                {r.weeklyFine > 0 && <div className="flex justify-between text-xs"><span className="text-ink-muted">Weekly ₹25</span><span className="num">{fmt(r.weeklyFine)}</span></div>}
+                {r.weeklyFine > 0 && <div className="flex justify-between text-xs"><span className="text-ink-muted">Weekly ₹{weeklyFineIncrement}</span><span className="num">{fmt(r.weeklyFine)}</span></div>}
                 <div className="flex justify-between text-sm font-semibold"><span className="text-danger">Total Fine</span><span className="num text-danger">{fmt(r.totalFine)}</span></div>
                 {r.paid > 0 && (
                   <div className="flex justify-between text-xs">
@@ -54,11 +64,11 @@ export default function FineSummaryPanel({ emis, onClose }: { emis: EMISchedule[
             );})}
             <div className="card bg-surface-2 p-4 text-xs text-ink-muted space-y-1">
               <p className="font-bold uppercase tracking-widest mb-1">How Fine Works</p>
-              <p>• ₹450 base fine when EMI becomes overdue</p>
-              <p>• First 30 days: NO weekly — just ₹450</p>
-              <p>• After 30 days: +₹25 every 7 days until fine is paid</p>
+              <p>• ₹{defaultFineAmount} base fine when EMI becomes overdue</p>
+              <p>• First 30 days: NO weekly — just ₹{defaultFineAmount}</p>
+              <p>• After 30 days: +₹{weeklyFineIncrement} every 7 days until fine is paid</p>
               <p>• EMI paid but fine not paid? Fine keeps growing</p>
-              <p>• Last EMI: ₹450 repeats every 30 days, NO weekly charge</p>
+              <p>• Last EMI: ₹{defaultFineAmount} repeats every 30 days, NO weekly charge</p>
             </div>
           </>)}
           <button onClick={onClose} className="btn-secondary w-full py-3">Close</button>
