@@ -45,8 +45,11 @@ export default function RetailerDashboard() {
   supabaseRef.current = supabase;
   const retailerRef = useRef<Retailer | null>(null);
   retailerRef.current = retailer;
+  const fineSettingsRef = useRef({ default_fine_amount: 450, weekly_fine_increment: 25 });
+  fineSettingsRef.current = fineSettings;
   const selectCustomerRef = useRef<(c: Customer) => Promise<void>>(async () => {});
 
+  // FIX: Load settings and retailer info on mount only
   useEffect(() => {
     loadRetailerInfo();
     loadFineSettings();
@@ -71,7 +74,7 @@ export default function RetailerDashboard() {
       // Load active broadcasts for this retailer
       const { data: broadcasts } = await sb
         .from('broadcast_messages')
-.select('id, message, image_url, expires_at, sender_name, sender_role')
+        .select('id, message, image_url, expires_at, sender_name, sender_role')
         .eq('target_retailer_id', data.id)
         .gt('expires_at', new Date().toISOString())
         .order('created_at', { ascending: false });
@@ -173,11 +176,11 @@ export default function RetailerDashboard() {
       const el = (emis as EMISchedule[]) || []; const nx = el.find(e => e.status === 'UNPAID' || e.status === 'PARTIALLY_PAID');
       const af = calculateTotalFineFromEmis(
         el,
-        Number(fineSettings.default_fine_amount || 450),
-        Number(fineSettings.weekly_fine_increment || 25),
+        fineSettingsRef.current.default_fine_amount,
+        fineSettingsRef.current.weekly_fine_increment,
       );
       const fc = customer.first_emi_charge_paid_at ? 0 : (customer.first_emi_charge_amount || 0);
-      setBreakdown({ customer_id: customer.id, customer_status: customer.status, next_emi_no: nx?.emi_no, next_emi_amount: nx?.amount, next_emi_due_date: nx?.due_date, next_emi_status: nx?.status, fine_due: af, first_emi_charge_due: fc, total_payable: (nx?.amount ?? 0) + af + fc, popup_first_emi_charge: fc > 0, popup_fine_due: af > 0, is_overdue: nx ? new Date(nx.due_date) < new Date() : false } as DueBreakdown);
+      setBreakdown({ customer_id: customer.id, customer_status: customer.status, next_emi_no: nx?.emi_no, next_emi_amount: nx?.amount, next_emi_due_date: nx?.due_date, next_emi_status: nx?.status, fine_due: af, first_emi_charge_due: fc, total_payable: (nx?.amount || 0) + af + fc, popup_first_emi_charge: false, popup_fine_due: false, is_overdue: false });
     } else setBreakdown(bd as DueBreakdown);
   }
 
@@ -435,22 +438,11 @@ export default function RetailerDashboard() {
               const hasUnpaidEmis = customerEmis.some(e => e.status === 'UNPAID' || e.status === 'PARTIALLY_PAID');
               return (
                 <>
-                  <div className="hidden sm:flex justify-end">
+                  <div className="flex justify-end">
                     <button
                       onClick={() => setShowPaymentModal(true)}
                       disabled={!hasUnpaidEmis}
                       className="btn-primary text-base px-8 py-3.5"
-                    >
-                      {!hasUnpaidEmis
-                        ? '✓ All EMIs Paid'
-                        : `💳 Collect EMI #${breakdown?.next_emi_no ?? ''}`}
-                    </button>
-                  </div>
-                  <div className="sm:hidden fixed bottom-16 left-0 right-0 z-30 px-4 pb-[max(env(safe-area-inset-bottom),0px)]">
-                    <button
-                      onClick={() => setShowPaymentModal(true)}
-                      disabled={!hasUnpaidEmis}
-                      className="btn-primary w-full text-base py-3.5 shadow-modal"
                     >
                       {!hasUnpaidEmis
                         ? '✓ All EMIs Paid'

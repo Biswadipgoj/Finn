@@ -86,8 +86,9 @@ const MONTHLY_HEADERS = [
   'Date',
   'EMI Amount',
   '1st emi charge',
+  'Fine Due',
   'remarks',
-  '', '', '', '', '', '',
+  '', '', '', '', '',
 ];
 
 export async function GET(req: NextRequest) {
@@ -211,22 +212,24 @@ export async function GET(req: NextRequest) {
       const firstEmi = customerEmis[0];
       const customerPayments = ((paymentRequests ?? []) as PaymentRequestRow[]).filter((payment) => payment.customer_id === customer.id);
       const maxEmiNo = customerEmis.length > 0 ? Math.max(...customerEmis.map((emi) => emi.emi_no)) : 0;
-      const totalFineRemaining = customerEmis.reduce((sum, emi) => {
-        const calculated = calculateSingleEmiFine(emi.due_date, emi.emi_no === maxEmiNo);
-        const effectiveFine = Math.max(calculated, Number(emi.fine_amount || 0));
-        return sum + Math.max(0, effectiveFine - Number(emi.fine_paid_amount || 0));
-      }, 0);
+      
+      // FINE CALCULATION FIX: Show only Outstanding Balance for current customer's due EMI
+      // Current EMI is the first unpaid or partially paid EMI
+      const currentEmi = customerEmis.find(e => e.status === 'UNPAID' || e.status === 'PARTIALLY_PAID');
+      let fineDue = 0;
+      if (currentEmi) {
+        const calculated = calculateSingleEmiFine(currentEmi.due_date, currentEmi.emi_no === maxEmiNo);
+        const effectiveFine = Math.max(calculated, Number(currentEmi.fine_amount || 0));
+        fineDue = Math.max(0, effectiveFine - Number(currentEmi.fine_paid_amount || 0));
+      }
 
       const remarks: string[] = [];
       for (const payment of customerPayments) {
         const approvedDate = payment.approved_at ? formatPaymentDate(payment.approved_at) : '';
         if (approvedDate) remarks.push(approvedDate);
         if (payment.utr) remarks.push(payment.utr);
-        if ((payment.fine_amount ?? 0) > 0) remarks.push(`${payment.total_emi_amount ?? 0}+${payment.fine_amount}`);
-        if ((payment.first_emi_charge_amount ?? 0) > 0) remarks.push(`${payment.first_emi_charge_amount}/-`);
-      }
-      if (totalFineRemaining > 0) {
-        remarks.push(`Fine: ${totalFineRemaining}`);
+        if ((payment.fine_amount ?? 0) > 0) remarks.push(`Fine: ${payment.fine_amount}`);
+        if ((payment.first_emi_charge_amount ?? 0) > 0) remarks.push(`Charge: ${payment.first_emi_charge_amount}`);
       }
 
       rows.push([
@@ -239,8 +242,9 @@ export async function GET(req: NextRequest) {
         customer.emi_due_day ?? '',
         customer.emi_amount ?? '',
         customer.first_emi_charge_amount && !customer.first_emi_charge_paid_at ? customer.first_emi_charge_amount : '',
+        fineDue > 0 ? fineDue : '',
         remarks.join(' | '),
-        '', '', '', '', '', '',
+        '', '', '', '', '',
       ]);
       dataRows.push(rows.length - 1);
     }
@@ -262,8 +266,8 @@ export async function GET(req: NextRequest) {
     { wch: 8 },
     { wch: 12 },
     { wch: 14 },
+    { wch: 12 },
     { wch: 36 },
-    { wch: 4 },
     { wch: 4 },
     { wch: 4 },
     { wch: 4 },
@@ -282,17 +286,16 @@ export async function GET(req: NextRequest) {
 
   const buffer = XLSX.write(workbook, {
     type: 'buffer',
-    bookType: 'xlsx',
-    cellStyles: true,
+    bookType: 'csv',
+    cellStyles: false,
   });
 
-  const filename = `TelePoint_Collection_${monthNames[month - 1]}_${year}.xlsx`;
+  const filename = `TelePoint_Collection_${monthNames[month - 1]}_${year}.csv`;
 
   return new NextResponse(buffer, {
     headers: {
-      'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'Content-Type': 'text/csv; charset=utf-8',
       'Content-Disposition': `attachment; filename="${filename}"`,
-
       'Cache-Control': 'no-store',
     },
   });

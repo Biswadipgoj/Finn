@@ -77,7 +77,9 @@ export default function PaymentModal({
   useEffect(() => {
     if (mode === 'UPI' && total > 0) {
       import('qrcode').then(QR => {
-        QR.toDataURL(`upi://pay?pa=${UPI_ID}&pn=TelePoint&am=${total}&tn=EMI${selectedEmiNo}_${customer.imei.slice(-6)}&cu=INR`, { width: 240, margin: 2, color: { dark: '#1e293b', light: '#ffffff' } }).then(setQrDataUrl);
+        QR.toDataURL(`upi://pay?pa=${UPI_ID}&pn=TelePoint&am=${total}&tn=EMI${selectedEmiNo}_${customer.imei.slice(-6)}&cu=INR`, { width: 240, margin: 2, color: { dark: '#1e293b', light: '#ffffff' } })
+          .then(url => setQrDataUrl(url))
+          .catch(() => {});
       }).catch(() => {});
     } else setQrDataUrl('');
   }, [mode, total, selectedEmiNo, customer.imei]);
@@ -144,7 +146,7 @@ export default function PaymentModal({
               <div className="h-px bg-surface-4" />
               <div className="flex justify-between"><span className="font-bold">Total</span><span className="num text-xl font-bold text-brand-600">{fmt(total)}</span></div>
             </div>
-            <button onClick={() => { const m = [`🧾 *TelePoint EMI Receipt*`,'',`👤 ${customer.customer_name}`,`📱 ${customer.mobile}`,`🔢 IMEI: ${customer.imei}`,'',emiAmt>0?`💳 EMI #${selectedEmiNo}: ${fmt(emiAmt)}`:'',chargeAmt>0?`⭐ Charge: ${fmt(chargeAmt)}`:'',fineAmt>0?`⚠️ Fine: ${fmt(fineAmt)}`:'',`💰 *Total: ${fmt(total)}*`,`🏷️ ${mode}`,`📅 ${formatDateTime(now)}`,'','— TelePoint'].filter(Boolean).join('\n'); window.open(`https://wa.me/?text=${encodeURIComponent(m)}`,'_blank'); }} className="btn w-full py-3 bg-green-500 hover:bg-green-600 text-white">📤 Share WhatsApp</button>
+            <button onClick={() => { const m = [`🧾 *TelePoint EMI Receipt*`,'',`👤 ${customer.customer_name}`,`📱 ${customer.mobile}`,`🔢 IMEI: ${customer.imei}`,'',emiAmt>0?`💳 EMI #${selectedEmiNo}: ${fmt(emiAmt)}`:'',chargeAmt>0?`⭐ 1st Charge: ${fmt(chargeAmt)}`:'',fineAmt>0?`⚠️ Fine: ${fmt(fineAmt)}`:'',`📊 Total: ${fmt(total)}`,`🕐 ${formatDateTime(now)}`].filter(Boolean).join('%0A'); window.open(`https://wa.me/?text=${m}`); }} className="btn-secondary w-full py-2">Share Receipt on WhatsApp</button>
             <button onClick={() => { onSubmitted(); onClose(); }} className="btn-ghost w-full py-2.5">Close</button>
           </div>
         </div>
@@ -163,6 +165,14 @@ export default function PaymentModal({
     );
   }
 
+  // MOBILE PAYMENT SUMMARY CARD
+  const openEmi = unpaidEmis[0];
+  const totalFineDue = calculateTotalFineFromEmis(emis, defaultFineAmount, weeklyFineIncrement);
+  const amountPaid = emis.reduce((sum, e) => sum + (e.status === 'APPROVED' ? (e.amount || 0) : 0), 0);
+  const totalLoanAmount = emis.reduce((sum, e) => sum + (e.amount || 0), 0);
+  const amountDue = totalLoanAmount - amountPaid;
+  const totalPayable = (openEmi ? (openEmi.amount || 0) - (openEmi.partial_paid_amount || 0) : 0) + totalFineDue;
+
   return (
     <div className="modal-backdrop" onClick={e => e.target === e.currentTarget && onClose()}>
       <div className="modal-panel flex flex-col h-[100dvh] sm:h-auto">
@@ -170,6 +180,22 @@ export default function PaymentModal({
           <div><h2 className="font-bold text-ink text-base sm:text-lg">{isAdmin ? 'Record Payment' : 'Submit Payment'}</h2><p className="text-ink-muted text-xs mt-0.5">{customer.customer_name} · {customer.imei}</p></div>
           <button onClick={onClose} className="btn-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M18 6L6 18M6 6l12 12"/></svg></button>
         </div>
+
+        {/* MOBILE SUMMARY - Sticky at top on mobile */}
+        <div className="sm:hidden sticky top-[60px] z-9 bg-surface-1 px-4 py-3 border-b border-surface-4 space-y-2">
+          <div className="text-xs text-ink-muted font-semibold uppercase tracking-widest">Payment Summary</div>
+          <div className="grid grid-cols-2 gap-2 text-xs">
+            <div className="p-2 bg-surface-2 rounded-lg"><p className="text-ink-muted">Loan Amount</p><p className="font-bold text-ink">{fmt(totalLoanAmount)}</p></div>
+            <div className="p-2 bg-surface-2 rounded-lg"><p className="text-ink-muted">Paid</p><p className="font-bold text-success">{fmt(amountPaid)}</p></div>
+            <div className="p-2 bg-surface-2 rounded-lg"><p className="text-ink-muted">Due</p><p className="font-bold text-warning">{fmt(amountDue)}</p></div>
+            <div className="p-2 bg-surface-2 rounded-lg"><p className="text-ink-muted">Fine Due</p><p className="font-bold text-danger">{fmt(totalFineDue)}</p></div>
+          </div>
+          <div className="p-2 bg-brand-50 rounded-lg border border-brand-200">
+            <p className="text-xs text-ink-muted">Total Payable (This EMI + Fine)</p>
+            <p className="font-bold text-lg text-brand-600">{fmt(totalPayable)}</p>
+          </div>
+        </div>
+
         <div className="p-4 space-y-4 overflow-y-auto min-h-0 pb-36 sm:pb-6">
           {/* WHAT TO COLLECT — checkboxes */}
           <div className="card bg-surface-2 p-4 space-y-3">
@@ -177,7 +203,7 @@ export default function PaymentModal({
             <label className={`flex items-center justify-between p-3 rounded-xl border-2 cursor-pointer transition-all ${collectEmi ? 'border-brand-400 bg-brand-50' : 'border-surface-4'}`}>
               <div className="flex items-center gap-3">
                 <input type="checkbox" checked={collectEmi} onChange={e => setCollectEmi(e.target.checked)} className="w-5 h-5 accent-brand-500 rounded" />
-                <div><p className="text-sm font-semibold text-ink">💳 EMI #{selectedEmiNo || '—'}</p><p className="text-xs text-ink-muted">Due: {fmt(scheduledEmiAmount)}{selectedEmi && Number(selectedEmi.partial_paid_amount || 0) > 0 ? ` · Paid ${fmt(selectedEmi.partial_paid_amount || 0)}` : ''}</p></div>
+                <div><p className="text-sm font-semibold text-ink">💳 EMI #{selectedEmiNo || '—'}</p><p className="text-xs text-ink-muted">Due: {fmt(scheduledEmiAmount)}{selectedEmi && Number(selectedEmi.partial_paid_amount || 0) > 0 ? ` (Remaining: ${fmt(scheduledEmiAmount)})` : ''}</p></div>
               </div>
               <span className="num font-semibold text-ink">{fmt(scheduledEmiAmount)}</span>
             </label>
@@ -203,8 +229,8 @@ export default function PaymentModal({
 
           {/* Fine Summary button */}
           {scheduledFine > 0 && (
-            <button type="button" onClick={() => setShowFineSummary(true)} className="w-full flex items-center justify-between px-4 py-2.5 rounded-xl border border-danger-border bg-danger-light text-left hover:border-danger transition-all">
-              <span className="text-sm font-semibold text-danger">⚠️ Fine Details</span>
+            <button type="button" onClick={() => setShowFineSummary(true)} className="w-full flex items-center justify-between px-4 py-2.5 rounded-xl border border-danger-border bg-danger-light text-sm font-semibold hover:bg-danger-100 transition-colors">
+              <span className="text-danger">⚠️ Fine Details</span>
               <span className="text-xs text-danger">View →</span>
             </button>
           )}
@@ -214,27 +240,27 @@ export default function PaymentModal({
             {unpaidEmis.length === 0 ? <p className="text-success font-semibold text-sm py-3 text-center">✓ All EMIs paid</p> : (
               <div className="space-y-2 max-h-48 overflow-y-auto">{unpaidEmis.map(emi => {
                 const sel = selectedEmiNo === emi.emi_no; const isOverdue = new Date(emi.due_date) < new Date();
-                return (<button key={emi.id} type="button" onClick={() => setSelectedEmiNo(emi.emi_no)} className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl border-2 text-left transition-all ${sel ? 'border-brand-400 bg-brand-50' : 'border-surface-4'}`}>
+                return (<button key={emi.id} type="button" onClick={() => setSelectedEmiNo(emi.emi_no)} className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl border-2 text-left transition-all ${sel ? 'border-brand-400 bg-brand-50' : 'border-surface-4 hover:border-surface-3'}`}>
                   <div className="flex items-center gap-2">
-                    <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${sel ? 'bg-brand-500 border-brand-500' : 'border-surface-4'}`}>{sel && <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="4"><path d="M20 6L9 17l-5-5"/></svg>}</div>
+                    <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${sel ? 'bg-brand-500 border-brand-500' : 'border-surface-4'}`}>{sel && <svg width="8" height="8" viewBox="0 0 24 24" fill="white"><circle cx="12" cy="12" r="2" /></svg>}</div>
                     <span className={`text-sm font-semibold ${sel ? 'text-brand-700' : 'text-ink'}`}>EMI #{emi.emi_no}</span>
                   </div>
-                  <div className="text-right"><span className="num text-sm font-semibold">{fmt(emi.amount)}</span><br/><span className={`text-[10px] ${isOverdue ? 'text-danger' : 'text-ink-muted'}`}>{formatDateOnly(emi.due_date)}{isOverdue && ' ⚠'}</span></div>
+                  <div className="text-right"><span className="num text-sm font-semibold">{fmt(emi.amount)}</span><br/><span className={`text-[10px] ${isOverdue ? 'text-danger' : 'text-ink-muted'}`}>{isOverdue ? 'Overdue' : 'Upcoming'}</span></div>
                 </button>);
               })}</div>
             )}
           </div>)}
 
           {/* Mode */}
-          <div className="flex gap-2">{(['CASH','UPI'] as const).map(m => (<button key={m} type="button" onClick={() => setMode(m)} className={`flex-1 py-3 rounded-xl border-2 text-sm font-semibold transition-all ${mode === m ? (m === 'CASH' ? 'border-success bg-success-light text-success' : 'border-info bg-info-light text-info') : 'border-surface-4 text-ink-muted'}`}>{m === 'CASH' ? '💵 Cash' : '📱 UPI'}</button>))}</div>
+          <div className="flex gap-2">{(['CASH','UPI'] as const).map(m => (<button key={m} type="button" onClick={() => setMode(m)} className={`flex-1 py-3 rounded-xl border-2 text-sm font-semibold transition-all ${mode === m ? 'border-brand-400 bg-brand-50 text-brand-600' : 'border-surface-4 text-ink hover:border-surface-3'}`}>{m}</button>))}</div>
           {mode === 'UPI' && (
             <div className="space-y-1">
               <label className="label">UTR / Unique Transaction Reference <span className="text-danger">*</span></label>
-              <input type="text" value={utr} onChange={e => setUtr(e.target.value)} placeholder="Enter UPI UTR immediately after payment" className={`input ${!utr.trim() ? 'border-warning' : ''}`} autoFocus />
+              <input type="text" value={utr} onChange={e => setUtr(e.target.value)} placeholder="Enter UPI UTR immediately after payment" className={`input ${!utr.trim() ? 'border-warning' : ''}`} />
             </div>
           )}
           {missingUtr && <p className="text-[11px] text-warning">UPI mode requires UTR / Reference to enable Record Payment.</p>}
-          {mode === 'UPI' && qrDataUrl && <div className="flex flex-col items-center"><img src={qrDataUrl} alt="QR" className="w-44 h-44 rounded-xl border border-surface-4" /><p className="num text-xs text-ink-muted mt-1">{UPI_ID}</p></div>}
+          {mode === 'UPI' && qrDataUrl && <div className="flex flex-col items-center"><img src={qrDataUrl} alt="QR" className="w-44 h-44 rounded-xl border border-surface-4" /><p className="num text-xs text-ink-muted mt-2">Scan and pay ₹{fmt(total)}</p></div>}
 
           {!isAdmin && <input type="password" value={retailerPin} onChange={e => setRetailerPin(e.target.value)} placeholder="Retail PIN *" inputMode="numeric" className="input" />}
           {missingRetailPin && <p className="text-[11px] text-warning">Retail PIN is required to submit payment.</p>}
@@ -243,9 +269,9 @@ export default function PaymentModal({
           {/* Editable amounts */}
           <div className="card bg-surface-2 p-3 space-y-2">
             <p className="text-xs font-bold text-ink-muted uppercase tracking-widest">Amounts <span className="font-normal text-brand-500">(editable)</span></p>
-            {collectEmi && <div className="flex items-center gap-2"><label className="text-xs text-ink-muted w-20">EMI</label><input type="number" min={0} value={editEmi} onChange={e => setEditEmi(e.target.value)} placeholder={String(scheduledEmiAmount)} className="input flex-1 py-2" inputMode="numeric" /></div>}
-            {collectFine && scheduledFine > 0 && <div className="flex items-center gap-2"><label className="text-xs text-danger w-20">Fine</label><input type="number" min={0} value={editFine} onChange={e => setEditFine(e.target.value)} placeholder={String(scheduledFine)} className="input flex-1 py-2" inputMode="numeric" /></div>}
-            {collectCharge && scheduledCharge > 0 && <div className="flex items-center gap-2"><label className="text-xs text-warning w-20">Charge</label><input type="number" min={0} value={editCharge} onChange={e => setEditCharge(e.target.value)} placeholder={String(scheduledCharge)} className="input flex-1 py-2" inputMode="numeric" /></div>}
+            {collectEmi && <div className="flex items-center gap-2"><label className="text-xs text-ink-muted w-20">EMI</label><input type="number" min={0} value={editEmi} onChange={e => setEditEmi(e.target.value)} placeholder={String(scheduledEmiAmount)} className="input flex-1 py-1 px-2 text-xs" /></div>}
+            {collectFine && scheduledFine > 0 && <div className="flex items-center gap-2"><label className="text-xs text-danger w-20">Fine</label><input type="number" min={0} value={editFine} onChange={e => setEditFine(e.target.value)} placeholder={String(scheduledFine)} className="input flex-1 py-1 px-2 text-xs" /></div>}
+            {collectCharge && scheduledCharge > 0 && <div className="flex items-center gap-2"><label className="text-xs text-warning w-20">Charge</label><input type="number" min={0} value={editCharge} onChange={e => setEditCharge(e.target.value)} placeholder={String(scheduledCharge)} className="input flex-1 py-1 px-2 text-xs" /></div>}
           </div>
 
           {/* Total */}
@@ -255,9 +281,11 @@ export default function PaymentModal({
           </div>
 
         </div>
-        <div className="fixed sm:sticky bottom-0 left-0 right-0 z-40 bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/80 border-t border-surface-4 p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] flex gap-3">
+
+        {/* MOBILE: Fixed bottom action buttons - ALWAYS VISIBLE */}
+        <div className="fixed sm:sticky bottom-0 left-0 right-0 z-40 bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/80 border-t border-surface-4 p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] flex gap-2">
           <button onClick={onClose} className="btn-secondary flex-1 py-3 font-semibold">Cancel</button>
-          <button onClick={handleSubmit} disabled={cannotSubmit} className="btn-primary flex-1 py-3 font-bold shadow-md shadow-brand-500/20">{loading ? '...' : isAdmin ? '✓ Record Payment' : '→ Submit Payment'}</button>
+          <button onClick={handleSubmit} disabled={cannotSubmit} className="btn-primary flex-1 py-3 font-bold shadow-md shadow-brand-500/20">{loading ? '...' : isAdmin ? '✓ Record Payment' : '📋 Submit Request'}</button>
         </div>
       </div>
     </div>
