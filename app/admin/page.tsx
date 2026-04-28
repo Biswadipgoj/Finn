@@ -781,7 +781,7 @@ export default function AdminDashboard() {
                     <div className="card overflow-hidden mt-3">
                       <table className="data-table text-xs sm:text-sm">
                         <thead>
-                          <tr><th>Customer</th><th>Amount</th><th>Mode</th><th>Status</th><th>Date</th><th>Notes</th></tr>
+                          <tr><th>Customer</th><th>Amount</th><th>Mode</th><th>UTR</th><th>EMI Paid On</th><th>Fine Paid On</th><th>Status</th><th>Date</th><th>Notes</th></tr>
                         </thead>
                         <tbody>
                           {utrResults.map(r => {
@@ -794,6 +794,9 @@ export default function AdminDashboard() {
                                 </td>
                                 <td><span className="font-num font-semibold">{fmt(r.total_amount)}</span></td>
                                 <td><span className={`text-xs font-semibold ${r.mode === 'UPI' ? 'text-info' : 'text-success'}`}>{r.mode}</span></td>
+                                <td className="text-xs font-num text-ink-muted break-all">{r.utr || '—'}</td>
+                                <td className="text-xs text-ink-muted">{r.approved_at ? formatDateOnly(r.approved_at) : '—'}</td>
+                                <td className="text-xs text-ink-muted">{r.approved_at && Number(r.fine_amount || 0) > 0 ? formatDateOnly(r.approved_at) : '—'}</td>
                                 <td>
                                   {(r.status === 'PENDING' || r.status === 'PENDING_APPROVAL') && <span className="badge-pending">Pending</span>}
                                   {r.status === 'APPROVED' && <span className="badge-approved">Approved</span>}
@@ -822,7 +825,7 @@ export default function AdminDashboard() {
                   <input
                     type="number"
                     value={fineSettings.default_fine_amount}
-                    onChange={(e) => setFineSettings((f) => ({ ...f, default_fine_amount: parseFloat(e.target.value) }))}
+                    onChange={(e) => setFineSettings((f) => ({ ...f, default_fine_amount: Number(e.target.value) || 0 }))}
                     className="form-input"
                     min={0}
                   />
@@ -832,7 +835,7 @@ export default function AdminDashboard() {
                   <input
                     type="number"
                     value={fineSettings.weekly_fine_increment}
-                    onChange={(e) => setFineSettings((f) => ({ ...f, weekly_fine_increment: parseFloat(e.target.value) }))}
+                    onChange={(e) => setFineSettings((f) => ({ ...f, weekly_fine_increment: Number(e.target.value) || 0 }))}
                     className="form-input"
                     min={0}
                   />

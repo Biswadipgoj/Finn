@@ -165,12 +165,12 @@ export default function PaymentModal({
 
   return (
     <div className="modal-backdrop" onClick={e => e.target === e.currentTarget && onClose()}>
-      <div className="modal-panel flex flex-col">
+      <div className="modal-panel flex flex-col h-[100dvh] sm:h-auto">
         <div className="sticky top-0 z-10 bg-white border-b border-surface-4 px-4 py-3 flex items-center justify-between">
           <div><h2 className="font-bold text-ink text-base sm:text-lg">{isAdmin ? 'Record Payment' : 'Submit Payment'}</h2><p className="text-ink-muted text-xs mt-0.5">{customer.customer_name} · {customer.imei}</p></div>
           <button onClick={onClose} className="btn-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M18 6L6 18M6 6l12 12"/></svg></button>
         </div>
-        <div className="p-4 space-y-4 overflow-y-auto pb-36 sm:pb-6">
+        <div className="p-4 space-y-4 overflow-y-auto min-h-0 pb-36 sm:pb-6">
           {/* WHAT TO COLLECT — checkboxes */}
           <div className="card bg-surface-2 p-4 space-y-3">
             <p className="text-xs font-bold text-ink-muted uppercase tracking-widest">Select What to Collect</p>

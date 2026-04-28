@@ -307,7 +307,7 @@ export default function RetailerDashboard() {
                 <div className="card overflow-hidden">
                   <table className="data-table text-xs sm:text-sm">
                     <thead>
-                      <tr><th>Customer</th><th>Amount</th><th>Mode</th><th>Status</th><th>Date</th><th></th></tr>
+                      <tr><th>Customer</th><th>Amount</th><th>Mode</th><th>UTR</th><th>Payment Date</th><th>Status</th><th>Date</th><th></th></tr>
                     </thead>
                     <tbody>
                       {myRequests.map(r => {
@@ -320,6 +320,8 @@ export default function RetailerDashboard() {
                             </td>
                             <td><span className="font-num font-semibold">{fmt(r.total_amount)}</span></td>
                             <td><span className={`text-xs font-semibold ${r.mode === 'UPI' ? 'text-info' : 'text-success'}`}>{r.mode}</span></td>
+                            <td><span className="font-num text-xs text-ink-muted break-all">{r.utr || '—'}</span></td>
+                            <td className="text-xs text-ink-muted">{r.approved_at ? format(new Date(r.approved_at), 'd MMM yyyy') : '—'}</td>
                             <td>
                               {(r.status === 'PENDING' || r.status === 'PENDING_APPROVAL') && <span className="badge-pending">Pending</span>}
                               {r.status === 'APPROVED' && <span className="badge-approved">Approved</span>}
