@@ -181,9 +181,9 @@ export default function PaymentModal({
           <button onClick={onClose} className="btn-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M18 6L6 18M6 6l12 12"/></svg></button>
         </div>
 
-        {/* MOBILE SUMMARY - Sticky at top on mobile */}
-        <div className="sm:hidden sticky top-[60px] z-9 bg-surface-1 px-4 py-3 border-b border-surface-4 space-y-2">
-          <div className="text-xs text-ink-muted font-semibold uppercase tracking-widest">Payment Summary</div>
+        {/* MOBILE SUMMARY */}
+        <div className="sm:hidden px-4 pt-3 space-y-2">
+          <div className="text-xs text-ink-muted font-semibold uppercase tracking-widest">Payment Page Summary</div>
           <div className="grid grid-cols-2 gap-2 text-xs">
             <div className="p-2 bg-surface-2 rounded-lg"><p className="text-ink-muted">Loan Amount</p><p className="font-bold text-ink">{fmt(totalLoanAmount)}</p></div>
             <div className="p-2 bg-surface-2 rounded-lg"><p className="text-ink-muted">Paid</p><p className="font-bold text-success">{fmt(amountPaid)}</p></div>
