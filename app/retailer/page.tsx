@@ -436,17 +436,24 @@ export default function RetailerDashboard() {
             {/* Collect payment button */}
             {selectedCustomer.status === 'RUNNING' ? (() => {
               const hasUnpaidEmis = customerEmis.some(e => e.status === 'UNPAID' || e.status === 'PARTIALLY_PAID');
+              const hasFineDue = Number(breakdown?.fine_due || 0) > 0;
+              const hasFirstChargeDue = Number(breakdown?.first_emi_charge_due || 0) > 0;
+              const canCollect = hasUnpaidEmis || hasFineDue || hasFirstChargeDue;
               return (
                 <>
                   <div className="flex justify-end">
                     <button
                       onClick={() => setShowPaymentModal(true)}
-                      disabled={!hasUnpaidEmis}
+                      disabled={!canCollect}
                       className="btn-primary text-base px-8 py-3.5"
                     >
-                      {!hasUnpaidEmis
-                        ? '✓ All EMIs Paid'
-                        : `💳 Collect EMI #${breakdown?.next_emi_no ?? ''}`}
+                      {!canCollect
+                        ? '✓ Nothing Due'
+                        : hasUnpaidEmis
+                          ? `💳 Collect EMI #${breakdown?.next_emi_no ?? ''}`
+                          : hasFineDue
+                            ? '⚠️ Collect Fine Payment'
+                            : '⭐ Collect 1st EMI Charge'}
                     </button>
                   </div>
                 </>
@@ -457,6 +464,28 @@ export default function RetailerDashboard() {
                 <p className="text-info/70 text-sm mt-0.5">Payment collection is not allowed for completed accounts.</p>
               </div>
             )}
+
+            {selectedCustomer.status === 'RUNNING' && (() => {
+              const hasUnpaidEmis = customerEmis.some(e => e.status === 'UNPAID' || e.status === 'PARTIALLY_PAID');
+              const hasFineDue = Number(breakdown?.fine_due || 0) > 0;
+              const hasFirstChargeDue = Number(breakdown?.first_emi_charge_due || 0) > 0;
+              const canCollect = hasUnpaidEmis || hasFineDue || hasFirstChargeDue;
+              if (!canCollect) return null;
+              return (
+                <div className="sm:hidden fixed bottom-16 left-0 right-0 z-40 px-4">
+                  <button
+                    onClick={() => setShowPaymentModal(true)}
+                    className="btn-primary w-full py-3.5 font-bold shadow-lg shadow-brand-500/25"
+                  >
+                    {hasUnpaidEmis
+                      ? `💳 Collect EMI #${breakdown?.next_emi_no ?? ''}`
+                      : hasFineDue
+                        ? '⚠️ Collect Fine Payment'
+                        : '⭐ Collect 1st EMI Charge'}
+                  </button>
+                </div>
+              );
+            })()}
 
             <EMIScheduleTable
               emis={customerEmis}
