@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react';
 import { Customer, EMISchedule, DueBreakdown } from '@/lib/types';
 import toast from 'react-hot-toast';
-import { calculateTotalFineFromEmis } from '@/lib/fineCalc';
+import { calculateOutstandingFineForEmi } from '@/lib/fineCalc';
 import FineSummaryPanel from './FineSummaryPanel';
 import { formatCurrency, formatDateOnly, formatDateTime, readJsonSafe } from '@/lib/formatters';
 
@@ -30,7 +30,10 @@ export default function PaymentModal({
   weeklyFineIncrement = 25,
 }: Props) {
   const unpaidEmis = emis.filter(e => e.status === 'UNPAID' || e.status === 'PARTIALLY_PAID');
-  const defaultEmiNo = breakdown?.next_emi_no ?? unpaidEmis[0]?.emi_no ?? 0;
+  const selectableEmis = isAdmin ? emis : unpaidEmis;
+  const defaultEmiNo = isAdmin
+    ? (breakdown?.next_emi_no ?? emis[0]?.emi_no ?? 0)
+    : (breakdown?.next_emi_no ?? unpaidEmis[0]?.emi_no ?? 0);
   const [selectedEmiNo, setSelectedEmiNo] = useState(defaultEmiNo);
   const [mode, setMode] = useState<'CASH' | 'UPI'>('CASH');
   const [utr, setUtr] = useState('');
@@ -43,10 +46,9 @@ export default function PaymentModal({
   const [showFineSummary, setShowFineSummary] = useState(false);
 
   // CHECKBOX-BASED: auto-tick what's due, user can manually untick
-  const selectedEmi = unpaidEmis.find(e => e.emi_no === selectedEmiNo) || emis.find(e => e.emi_no === selectedEmiNo);
+  const selectedEmi = selectableEmis.find(e => e.emi_no === selectedEmiNo) || emis.find(e => e.emi_no === selectedEmiNo);
   const scheduledEmiAmount = selectedEmi ? Math.max(0, Number(selectedEmi.amount || 0) - Number(selectedEmi.partial_paid_amount || 0)) : 0;
-  const autoFine = calculateTotalFineFromEmis(emis, defaultFineAmount, weeklyFineIncrement);
-  const scheduledFine = Math.max(breakdown?.fine_due ?? 0, autoFine);
+  const scheduledFine = calculateOutstandingFineForEmi(selectedEmi, emis, defaultFineAmount, weeklyFineIncrement);
   const scheduledCharge = breakdown?.first_emi_charge_due ?? (customer.first_emi_charge_paid_at ? 0 : (customer.first_emi_charge_amount || 0));
 
   const [collectEmi, setCollectEmi] = useState(true);
@@ -69,7 +71,7 @@ export default function PaymentModal({
 
   // Auto-tick what's due when fine/charge changes
   useEffect(() => { setCollectFine(scheduledFine > 0); setCollectCharge(scheduledCharge > 0); }, [scheduledFine, scheduledCharge]);
-  useEffect(() => { if (selectedEmiNo === 0 && unpaidEmis.length > 0) setSelectedEmiNo(unpaidEmis[0].emi_no); }, [selectedEmiNo, unpaidEmis]);
+  useEffect(() => { if (selectedEmiNo === 0 && selectableEmis.length > 0) setSelectedEmiNo(selectableEmis[0].emi_no); }, [selectedEmiNo, selectableEmis]);
   useEffect(() => { setEditEmi(''); setEditFine(''); setEditCharge(''); }, [selectedEmiNo]);
   useEffect(() => { if (mode !== 'UPI') setUtr(''); }, [mode]);
 
@@ -167,7 +169,7 @@ export default function PaymentModal({
 
   // MOBILE PAYMENT SUMMARY CARD
   const openEmi = unpaidEmis[0];
-  const totalFineDue = calculateTotalFineFromEmis(emis, defaultFineAmount, weeklyFineIncrement);
+  const totalFineDue = calculateOutstandingFineForEmi(openEmi, emis, defaultFineAmount, weeklyFineIncrement);
   const amountPaid = emis.reduce((sum, e) => sum + (e.status === 'APPROVED' ? (e.amount || 0) : 0), 0);
   const totalLoanAmount = emis.reduce((sum, e) => sum + (e.amount || 0), 0);
   const amountDue = totalLoanAmount - amountPaid;
@@ -182,7 +184,7 @@ export default function PaymentModal({
         </div>
 
         {/* MOBILE SUMMARY */}
-        <div className="sm:hidden px-4 pt-3 space-y-2">
+        {!isAdmin && <div className="sm:hidden px-4 pt-3 space-y-2">
           <div className="text-xs text-ink-muted font-semibold uppercase tracking-widest">Payment Page Summary</div>
           <div className="grid grid-cols-2 gap-2 text-xs">
             <div className="p-2 bg-surface-2 rounded-lg"><p className="text-ink-muted">Loan Amount</p><p className="font-bold text-ink">{fmt(totalLoanAmount)}</p></div>
@@ -194,7 +196,7 @@ export default function PaymentModal({
             <p className="text-xs text-ink-muted">Total Payable (This EMI + Fine)</p>
             <p className="font-bold text-lg text-brand-600">{fmt(totalPayable)}</p>
           </div>
-        </div>
+        </div>}
 
         <div className="p-4 space-y-4 overflow-y-auto min-h-0 pb-36 sm:pb-6">
           {/* WHAT TO COLLECT — checkboxes */}
@@ -237,8 +239,8 @@ export default function PaymentModal({
 
           {/* EMI Selector */}
           {collectEmi && (<div><label className="label">Select EMI *</label>
-            {unpaidEmis.length === 0 ? <p className="text-success font-semibold text-sm py-3 text-center">✓ All EMIs paid</p> : (
-              <div className="space-y-2 max-h-48 overflow-y-auto">{unpaidEmis.map(emi => {
+            {selectableEmis.length === 0 ? <p className="text-success font-semibold text-sm py-3 text-center">✓ All EMIs paid</p> : (
+              <div className="space-y-2 max-h-48 overflow-y-auto">{selectableEmis.map(emi => {
                 const sel = selectedEmiNo === emi.emi_no; const isOverdue = new Date(emi.due_date) < new Date();
                 return (<button key={emi.id} type="button" onClick={() => setSelectedEmiNo(emi.emi_no)} className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl border-2 text-left transition-all ${sel ? 'border-brand-400 bg-brand-50' : 'border-surface-4 hover:border-surface-3'}`}>
                   <div className="flex items-center gap-2">
