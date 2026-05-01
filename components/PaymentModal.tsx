@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react';
 import { Customer, EMISchedule, DueBreakdown } from '@/lib/types';
 import toast from 'react-hot-toast';
-import { calculateTotalFineFromEmis } from '@/lib/fineCalc';
+import { calculateOutstandingFineForEmi } from '@/lib/fineCalc';
 import FineSummaryPanel from './FineSummaryPanel';
 import { formatCurrency, formatDateOnly, formatDateTime, readJsonSafe } from '@/lib/formatters';
 
@@ -45,8 +45,7 @@ export default function PaymentModal({
   // CHECKBOX-BASED: auto-tick what's due, user can manually untick
   const selectedEmi = unpaidEmis.find(e => e.emi_no === selectedEmiNo) || emis.find(e => e.emi_no === selectedEmiNo);
   const scheduledEmiAmount = selectedEmi ? Math.max(0, Number(selectedEmi.amount || 0) - Number(selectedEmi.partial_paid_amount || 0)) : 0;
-  const autoFine = calculateTotalFineFromEmis(emis, defaultFineAmount, weeklyFineIncrement);
-  const scheduledFine = Math.max(breakdown?.fine_due ?? 0, autoFine);
+  const scheduledFine = calculateOutstandingFineForEmi(selectedEmi, emis, defaultFineAmount, weeklyFineIncrement);
   const scheduledCharge = breakdown?.first_emi_charge_due ?? (customer.first_emi_charge_paid_at ? 0 : (customer.first_emi_charge_amount || 0));
 
   const [collectEmi, setCollectEmi] = useState(true);
@@ -167,7 +166,7 @@ export default function PaymentModal({
 
   // MOBILE PAYMENT SUMMARY CARD
   const openEmi = unpaidEmis[0];
-  const totalFineDue = calculateTotalFineFromEmis(emis, defaultFineAmount, weeklyFineIncrement);
+  const totalFineDue = calculateOutstandingFineForEmi(openEmi, emis, defaultFineAmount, weeklyFineIncrement);
   const amountPaid = emis.reduce((sum, e) => sum + (e.status === 'APPROVED' ? (e.amount || 0) : 0), 0);
   const totalLoanAmount = emis.reduce((sum, e) => sum + (e.amount || 0), 0);
   const amountDue = totalLoanAmount - amountPaid;

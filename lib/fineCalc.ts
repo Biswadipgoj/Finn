@@ -108,3 +108,22 @@ export function getPerEmiFineBreakdown(
   }
   return result;
 }
+
+export function calculateOutstandingFineForEmi(
+  emi: EMISchedule | undefined,
+  allEmis: EMISchedule[],
+  baseFine: number = BASE,
+  weeklyIncrement: number = WEEKLY,
+): number {
+  if (!emi || emi.fine_waived) return 0;
+  const todayIST = getISTDateString();
+  const maxEmiNo = allEmis.length > 0 ? Math.max(...allEmis.map(e => e.emi_no)) : emi.emi_no;
+  const isOverdue = ['UNPAID', 'PARTIALLY_PAID'].includes(emi.status) && diffDateOnlyDays(emi.due_date, todayIST) > 0;
+  const hasStoredUnpaidFine = (emi.fine_amount || 0) > (emi.fine_paid_amount || 0);
+  if (!isOverdue && !hasStoredUnpaidFine) return 0;
+
+  const isLast = emi.emi_no === maxEmiNo;
+  const calc = isOverdue ? calculateSingleEmiFine(emi.due_date, isLast, baseFine, weeklyIncrement) : 0;
+  const effective = Math.max(calc, emi.fine_amount || 0);
+  return Math.max(0, effective - (emi.fine_paid_amount || 0));
+}
