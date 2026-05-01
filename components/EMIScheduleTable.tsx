@@ -48,15 +48,12 @@ export default function EMIScheduleTable({ emis, isAdmin, nextUnpaidNo, onRefres
       paid_at: emi.paid_at ? emi.paid_at.split('T')[0] : '',
       mode: emi.mode || '',
       utr: emi.utr || '',
+      fine_paid_amount: String(emi.fine_paid_amount || 0),
       fine_paid_at: emi.fine_paid_at ? emi.fine_paid_at.split('T')[0] : '',
     });
   }
 
   async function saveEdit(emi: EMISchedule) {
-    if (fineOverride === '' && dateOverride === '') {
-      toast.error('No changes to save');
-      return;
-    }
     setSaving(true);
     const updates: Record<string, unknown> = {};
     if (editForm.due_date) updates.due_date = editForm.due_date;
@@ -68,10 +65,20 @@ export default function EMIScheduleTable({ emis, isAdmin, nextUnpaidNo, onRefres
     if (editForm.fine_amount !== '') updates.fine_amount = parseFloat(editForm.fine_amount) || 0;
     if (editForm.fine_paid_amount !== '') updates.fine_paid_amount = parseFloat(editForm.fine_paid_amount) || 0;
     updates.fine_paid_at = editForm.fine_paid_at ? new Date(editForm.fine_paid_at).toISOString() : null;
-    const { error } = await supabase.from('emi_schedule').update(updates).eq('id', emi.id);
-    setSaving(false);
-    if (error) toast.error(error.message);
-    else { toast.success('EMI updated'); setEditingId(null); onRefresh?.(); }
+    try {
+      const { error } = await supabase.from('emi_schedule').update(updates).eq('id', emi.id);
+      if (error) {
+        toast.error(error.message);
+        return;
+      }
+      toast.success('EMI updated');
+      setEditingId(null);
+      await Promise.resolve(onRefresh?.());
+    } catch (e: unknown) {
+      toast.error(e instanceof Error ? e.message : 'Failed to update EMI');
+    } finally {
+      setSaving(false);
+    }
   }
 
   return (
@@ -253,7 +260,7 @@ export default function EMIScheduleTable({ emis, isAdmin, nextUnpaidNo, onRefres
                       ) : (
                         <div className="flex items-center gap-1 justify-end">
                           <button
-                            onClick={() => { setEditingId(emi.id); setFineOverride(String(emi.fine_amount || 0)); setDateOverride(emi.due_date || ''); }}
+                            onClick={() => startEdit(emi)}
                             className="btn-ghost text-xs px-2 py-1"
                           >{'\u270F'}</button>
                         </div>
@@ -296,7 +303,7 @@ export default function EMIScheduleTable({ emis, isAdmin, nextUnpaidNo, onRefres
                   {emi.status === 'UNPAID' && <span className={`badge ${isOverdue ? 'badge-red' : 'badge-gray'}`}>{isOverdue ? 'Overdue' : 'Unpaid'}</span>}
                   {isAdmin && !editing && (
                     <button
-                      onClick={() => { setEditingId(emi.id); setFineOverride(String(emi.fine_amount || 0)); setDateOverride(emi.due_date || ''); }}
+                      onClick={() => startEdit(emi)}
                       className="btn-ghost text-xs px-2 py-1"
                     >
                       ✏ Edit
@@ -308,7 +315,7 @@ export default function EMIScheduleTable({ emis, isAdmin, nextUnpaidNo, onRefres
                 <p className="text-ink-muted">Due Date</p>
                 <p className="text-right num font-semibold">
                   {editing ? (
-                    <input type="date" value={dateOverride || emi.due_date} onChange={e => setDateOverride(e.target.value)} className="input py-1 px-2 text-xs w-full" />
+                    <input type="date" value={editForm.due_date || emi.due_date} onChange={e => setEditForm(f => ({ ...f, due_date: e.target.value }))} className="input py-1 px-2 text-xs w-full" />
                   ) : format(dueDate, 'd MMM yyyy')}
                 </p>
                 <p className="text-ink-muted">EMI Amount</p><p className="text-right num font-semibold text-brand-700">{fmt(emi.amount)}</p>
@@ -316,7 +323,7 @@ export default function EMIScheduleTable({ emis, isAdmin, nextUnpaidNo, onRefres
                 <p className="text-ink-muted">Remaining Fine</p>
                 <p className="text-right num font-semibold text-danger">
                   {editing ? (
-                    <input type="number" value={fineOverride} onChange={e => setFineOverride(e.target.value)} min={0} className="input py-1 px-2 text-xs w-full" />
+                    <input type="number" value={editForm.fine_amount} onChange={e => setEditForm(f => ({ ...f, fine_amount: e.target.value }))} min={0} className="input py-1 px-2 text-xs w-full" />
                   ) : (displayFine > 0 ? fmt(fineRemaining > 0 ? fineRemaining : displayFine) : '—')}
                 </p>
                 <p className="text-ink-muted">Fine Status</p><p className={`text-right font-semibold ${fineStatus === 'Paid' ? 'text-success' : fineStatus === 'Due' ? 'text-danger' : 'text-warning'}`}>{fineStatus}</p>
